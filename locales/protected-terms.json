@@ -1,0 +1,26 @@
+{
+  "description": "保護詞白名單：英文原文中出現的這些詞，譯文必須原樣保留（大小寫敏感）。斜線指令、通訊協定、版本控制與產品名稱一律不翻譯。",
+  "terms": [
+    "/plan",
+    "/swarm",
+    "/review",
+    "@",
+    "MCP",
+    "Git",
+    "SSH",
+    "Diff",
+    "Worktree",
+    "Agent",
+    "Antigravity",
+    "Gemini",
+    "Google",
+    "agy",
+    "Token",
+    "Tab",
+    "Esc",
+    "Ctrl+C",
+    "API",
+    "JSON",
+    "URL"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "antigravity-i18n",
+  "version": "0.1.0",
+  "description": "跨平台 Google Antigravity 繁體中文（zh-TW）與簡體中文（zh-CN）中文化 CLI 工具",
+  "type": "module",
+  "bin": {
+    "antigravity-i18n": "dist/cli.js"
+  },
+  "main": "dist/cli.js",
+  "files": [
+    "dist",
+    "locales",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "node dist/cli.js validate",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test && node dist/cli.js validate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "antigravity",
+    "i18n",
+    "l10n",
+    "zh-TW",
+    "zh-CN",
+    "chinese",
+    "localization",
+    "electron",
+    "asar"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@electron/asar": "^3.4.1",
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
