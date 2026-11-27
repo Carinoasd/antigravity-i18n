@@ -323,7 +323,13 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --tint none   # 移除遮罩
 - **一鍵切換 5 款內建預設**：極光、星雲、霓虹夕陽、深夜藍、靜謐森林（與 `bg preset` 同一份預設表）
 - **即時微調**：啟用／停用、不透明度（0.01 ~ 1.00）、模糊（0 ~ 32px）、對齊（置中／上／下／左／右）、縮放（cover / contain）、遮罩（無／暗色 25%／深暗 45%／深藍 35%）、圖層模式（overlay / underlay）
 - **重設**：清除介面設定，改回 CLI 的 `background.json`（沒有 CLI 設定時即關閉背景）
-- **中／英文切換**：停用翻譯後，已翻譯的文字需重新整理頁面（`Ctrl + R`）才會恢復英文原文；重新啟用則立即翻譯
+- **介面語言：五語免重整即時切換**：繁體中文／简体中文／日本語／한국어／English（原文）。`apply` 會把四語詞庫以共享 key 的精簡格式一起打包進 runtime（約為四份獨立詞庫的一半大小），切換時先把整頁還原成英文原文、再以新語系重新翻譯，不必重新整理。英文原文以 `WeakMap` 記住，節點被移除後自動回收。只會切換介面上的文字；主行程的原生選單與系統匣維持 `apply` 時的語系
+- **桌布收藏夾**：「加入目前圖片」把目前的背景圖存進收藏夾，點縮圖一鍵切換、✕ 刪除。為了控制記憶體，**單張 ≤ 10 MB、最多 12 張、總容量 ≤ 30 MB**，超過時面板會提示；平時只在記憶體保留目前這一張，縮圖只在面板開啟時讀取、關閉即釋放
+- **自動輪播**：關閉／每次開啟視窗換下一張／每 15、30、60 分鐘，另有「下一張」按鈕
+- **外觀微調**（預設皆關閉）：
+  - **CJK 介面字型最佳化**：一般介面改用 `PingFang TC`、`Microsoft JhengHei UI`、`Noto Sans CJK TC`、`Hiragino Sans`、`Malgun Gothic` 字型堆疊；程式碼、編輯器、終端機與 mono 類別的等寬字型不受影響
+  - **毛玻璃卡片模式**：對話框、選單、卡片等加上半透明與 `backdrop-filter: blur(10px)`
+  - 兩者都是獨立的 `<style>`，開關立即生效、立即移除
 
 **儲存與優先順序**
 
@@ -332,7 +338,9 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --tint none   # 移除遮罩
 - 只調整參數、沒有換圖時，面板會沿用 CLI 的圖片，只保存調整過的參數
 - 無法使用 IndexedDB（例如權限限制）時，自動降級為「只在目前視窗生效」並在面板中提示，不會影響 App 啟動
 - 從 IndexedDB 讀回的資料會重新驗證（數值範圍、選項白名單、圖片格式），被竄改的內容不會套用
-- 中／英文切換的選擇存在 `localStorage`：翻譯 runtime 必須在第一次掃描畫面前同步得知，IndexedDB 是非同步的
+- 收藏夾存在同一個 IndexedDB 的 `gallery` store（資料庫版本 2，舊版的 `settings` 完整保留）；選了收藏中的圖片時，設定只記錄收藏的 id，不重複存放圖片。讀回的收藏與偏好一律重新驗證，被竄改或超過上限的資料不會套用
+- 外觀微調與輪播設定與背景設定分開存放，按「重設」不會清除
+- 介面語言存在 `localStorage` 的 `antigravity-i18n:lang`：翻譯 runtime 必須在第一次掃描畫面前同步得知，IndexedDB 是非同步的。以其他語系重新 `apply` 後，舊的選擇不再生效；舊版的 `antigravity-i18n:i18n-disabled` 旗標仍然有效
 
 面板與背景圖層都帶有 `data-antigravity-i18n-skip`，不會被翻譯 runtime 處理。只想停用面板、保留 CLI 背景時，以 `ANTIGRAVITY_I18N_NO_PANEL=1` 啟動 Antigravity。
 
@@ -342,7 +350,7 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --tint none   # 移除遮罩
 - 略過純數字／符號、網址、Email、檔案路徑、快捷鍵、超過 120 字元的長段落，以及已含中日韓文字的字串
 - 「**複製 JSON**」輸出 `{ "Original Text": "" }` 格式（可直接貼進詞庫補上譯文）；「**前往 GitHub 回報**」開啟缺少翻譯的 issue 範本
 
-前置條件：背景圖與面板由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤（目前為 v5：v2 支援圖片，v3 加上預設與遮罩，v4 加上介面內背景面板，v5 加上未翻譯掃描）；`bg status` 與 `status` 會提示目前狀態，透過 `launch` 啟動時也會自動升級。
+前置條件：背景圖與面板由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤（目前為 v6：v2 支援圖片，v3 加上預設與遮罩，v4 加上介面內背景面板，v5 加上未翻譯掃描，v6 加上桌布收藏夾與輪播、外觀微調與五語即時切換）；`bg status` 與 `status` 會提示目前狀態，透過 `launch` 啟動時也會自動升級。
 
 **WSL**：Windows 版 Antigravity 讀的是 Windows 家目錄下的 `C:\Users\<你>\.antigravity-i18n\background.json`。在 WSL 中執行 `bg` 指令時會：
 
