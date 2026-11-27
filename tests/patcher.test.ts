@@ -312,6 +312,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
     write(path.join(src, 'dist', 'updater.js'), `dialog.showMessageBox({message:"Update Available",buttons:["Restart Now","Later"]});`);
     write(path.join(src, 'dist', 'tray.js'), `tray.setToolTip("Open Antigravity");if(mode==="Later"){}`);
     write(path.join(src, 'dist', 'preload.js'), `contextBridge.exposeInMainWorld("x",{});`);
+    write(path.join(src, 'dist', '__mocks__', 'electron.js'), `module.exports={menu:{label:"Settings"}};`);
     const root = path.join(dir, 'Antigravity2');
     const asarPath = path.join(root, 'resources', 'app.asar');
     fs.mkdirSync(path.dirname(asarPath), { recursive: true });
@@ -364,6 +365,8 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
     expect(read(asarPath, 'dist/updater.js')).toBe(`dialog.showMessageBox({message:"有可用的更新",buttons:["立即重新啟動","稍後"]});`);
     expect(read(asarPath, 'dist/tray.js')).toBe(`tray.setToolTip("開啟 Antigravity");if(mode==="Later"){}`);
     expect(read(asarPath, 'dist/preload.js')).toBe(`contextBridge.exposeInMainWorld("x",{});`);
+    // __mocks__ 不翻譯
+    expect(read(asarPath, 'dist/__mocks__/electron.js')).toBe(`module.exports={menu:{label:"Settings"}};`);
 
     const main = read(asarPath, 'dist/main.js');
     expect(main.startsWith(`'use strict';\n${HOOK_BEGIN}`)).toBe(true);

@@ -16,6 +16,7 @@ import {
   detectModuleFormat,
   hasHook,
   injectHook,
+  isInternalUrl,
   resolveMainEntry,
   runtimeEntryPath,
   stripHook,
@@ -230,6 +231,53 @@ describe('主行程掛鉤：注入與移除', () => {
   });
 });
 
+describe('isInternalUrl：只注入 App 內部頁面', () => {
+  it.each([
+    'file:///C:/Users/me/AppData/Local/Programs/Antigravity/resources/app.asar/dist/index.html',
+    'file:///opt/Antigravity/resources/app.asar/dist/index.html',
+    'app://-/index.html',
+    'antigravity://workbench/index.html',
+    'http://localhost:5173/',
+    'https://localhost/',
+    'http://LOCALHOST:3000/path',
+    'http://127.0.0.1:8080/index.html',
+    'http://[::1]:9000/',
+    'blob:file:///opt/app/abc',
+    'blob:http://localhost:5173/uuid',
+  ])('允許：%s', (url) => {
+    expect(isInternalUrl(url)).toBe(true);
+  });
+
+  it.each([
+    'https://example.com/',
+    'http://github.com/Carinoasd/antigravity-i18n',
+    'HTTPS://ACCOUNTS.GOOGLE.COM/',
+    'https://localhost.evil.com/',
+    'http://127.0.0.1.nip.io/',
+    'http://10.0.0.5/',
+    'https://antigravity.google/',
+    'devtools://devtools/bundled/inspector.html',
+    'chrome://gpu',
+    'chrome-extension://abc/popup.html',
+    'chrome-error://chromewebdata/',
+    'about:blank',
+    'view-source:file:///x.html',
+    'data:text/html,<b>Settings</b>',
+    'javascript:alert(1)',
+    'blob:https://example.com/uuid',
+    '',
+    'not a url',
+  ])('略過：%s', (url) => {
+    expect(isInternalUrl(url)).toBe(false);
+  });
+
+  it('內嵌進掛鉤的版本與匯出的函式一致', () => {
+    const hook = injectHook('foo();\n', 'cjs');
+    expect(hook).toContain('var __agi18nIsInternalUrl = function (url)');
+    expect(hook).not.toMatch(/\bisInternalUrl\(/);
+  });
+});
+
 describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
   type FakeWc = EventEmitter & { type: string; url: string; injected: string[] };
   let dir: string;
@@ -297,6 +345,41 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     // 每次換頁（新的 dom-ready）都會重新注入
     win.emit('dom-ready');
     expect(win.injected).toHaveLength(2);
+  });
+
+  it('略過外部 http/https 網站，只注入本機與內部 scheme', () => {
+    const main = makeApp('cjs');
+    createRequire(main)(main);
+    const cases: [string, boolean][] = [
+      ['https://example.com/', false],
+      ['https://accounts.google.com/signin', false],
+      ['http://localhost:5173/', true],
+      ['http://127.0.0.1:3000/', true],
+      ['http://[::1]:8080/', true],
+      ['app://-/index.html', true],
+      ['chrome-error://chromewebdata/', false],
+      ['about:blank', false],
+    ];
+    for (const [url, expected] of cases) {
+      // 內建瀏覽器的 WebContentsView 也是 browserView 類型
+      const wc = fakeWc('browserView', url);
+      app.emit('web-contents-created', {}, wc);
+      wc.emit('dom-ready');
+      expect([url, wc.injected.length]).toEqual([url, expected ? 1 : 0]);
+    }
+  });
+
+  it('同一個視窗導向外部網站後不再注入', () => {
+    const main = makeApp('cjs');
+    createRequire(main)(main);
+    const wc = fakeWc('window', 'file:///app/index.html');
+    app.emit('web-contents-created', {}, wc);
+    wc.emit('dom-ready');
+    wc.url = 'https://example.com/';
+    wc.emit('dom-ready');
+    wc.url = 'file:///app/settings.html';
+    wc.emit('dom-ready');
+    expect(wc.injected).toHaveLength(2);
   });
 
   it('ESM：以 import.meta.url 讀取 runtime 並注入', async () => {

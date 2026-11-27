@@ -62,12 +62,42 @@ export function buildRuntimeScript(dict: Dictionary, options: OverlayOptions): s
   ].join('\n');
 }
 
+/**
+ * 判斷 webContents 的網址是否為 App 自己的內部頁面（才注入 runtime）。
+ *
+ * - 允許：`file:`、App 自訂的內部 scheme（如 `app:`、`antigravity:`），以及本機的
+ *   `http:` / `https:`（`localhost`、`127.0.0.1`、`[::1]`）
+ * - 略過：外部 `http:` / `https:` 網站（例如內建瀏覽器開啟的網頁）、`devtools:`、
+ *   `chrome:`、`chrome-extension:`、`chrome-error:`、`about:`、`view-source:`、`data:`
+ * - `blob:` 依其來源網址判斷；無法解析的網址一律略過
+ *
+ * ⚠️ 此函式會以 `toString()` 內嵌進主行程掛鉤，必須完全自足。
+ */
+export function isInternalUrl(url: string): boolean {
+  if (typeof url !== 'string' || url === '') return false;
+  const m = /^([a-z][a-z0-9+.-]*):/i.exec(url);
+  if (!m || !m[1]) return false;
+  const scheme = m[1].toLowerCase();
+  if (['devtools', 'chrome', 'chrome-extension', 'chrome-error', 'about', 'view-source', 'data', 'javascript'].includes(scheme)) {
+    return false;
+  }
+  if (scheme === 'blob') return isInternalUrl(url.slice(m[0].length));
+  if (scheme !== 'http' && scheme !== 'https') return true;
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+}
+
 /** 主行程掛鉤共用邏輯（CJS / ESM 變體共用） */
 function installSource(): string {
-  return `function __agi18nInstall(app, code) {
+  return `var __agi18nIsInternalUrl = ${isInternalUrl.toString().replace(/\bisInternalUrl\(/g, '__agi18nIsInternalUrl(').replace(/^function __agi18nIsInternalUrl\(/, 'function (')};
+    function __agi18nInstall(app, code) {
     if (!app || !code || globalThis.__ANTIGRAVITY_I18N_HOOK__) return;
     globalThis.__ANTIGRAVITY_I18N_HOOK__ = true;
-    var SKIP_URL = /^(devtools|chrome|chrome-extension|chrome-error|about):/i;
     app.on('web-contents-created', function (_event, wc) {
       var type = '';
       try { type = wc.getType(); } catch (e) {}
@@ -76,7 +106,8 @@ function installSource(): string {
       wc.on('dom-ready', function () {
         var url = '';
         try { url = wc.getURL(); } catch (e) {}
-        if (SKIP_URL.test(url)) return;
+        // 每次載入都重新判斷：視窗導向外部網站時不注入
+        if (!__agi18nIsInternalUrl(url)) return;
         Promise.resolve(wc.executeJavaScript(code, true)).catch(function (err) {
           console.warn('[antigravity-i18n] runtime inject failed:', err && err.message);
         });

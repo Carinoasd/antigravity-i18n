@@ -93,7 +93,9 @@ interface PlannedWrite {
 }
 
 function isAsarContent(p: string): boolean {
-  if (p.split('/').includes('node_modules')) return false;
+  const parts = p.split('/');
+  // 第三方套件與測試用的 mock（例如 dist/__mocks__/electron.js）不翻譯
+  if (parts.includes('node_modules') || parts.includes('__mocks__')) return false;
   if (path.posix.basename(p) === 'package.json') return false;
   return CONTENT_EXTS.includes(path.posix.extname(p).toLowerCase());
 }

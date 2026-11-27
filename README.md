@@ -206,6 +206,8 @@ Antigravity 2.0 桌面版的 `app.asar` 裡只有 Electron 主行程與殼層（
    註冊 `app.on('web-contents-created')`，在每個視窗 `dom-ready` 時以 `webContents.executeJavaScript()` 注入 runtime。
    - 支援 CommonJS 與 ESM 入口（依 `package.json` `type` 與副檔名判斷）
    - 只注入應用程式自己的視窗（`window` / `browserView`），不注入 `<webview>`、DevTools 與背景頁
+   - 每次載入都檢查網址，只注入 App 內部頁面：`file:`、App 自訂 scheme（如 `app:`），以及本機的 `http(s)://localhost`、`127.0.0.1`、`[::1]`；
+     **外部 `http:` / `https:` 網站（例如內建瀏覽器開啟的網頁）一律略過**，`devtools:`、`chrome:`、`chrome-extension:`、`chrome-error:`、`about:`、`data:` 也不注入
    - 讀不到 runtime 或發生任何錯誤時只會在主控台警告，不影響 App 啟動
 3. runtime 在頁面中以 `window.__ANTIGRAVITY_I18N__` 為標記，同一份文件不會重複安裝。
 
@@ -260,7 +262,7 @@ Electron / VS Code 的 bundle 裡，`"Off"`、`"Run"` 這類短字串常常同�
 - **短字串**只在 UI 語境替換：`label:`、`title:`、`tooltip:`、`placeholder:`、`children:`、`buttons: [...]`、`setToolTip(...)`、`localize(key, "...")`、`createElement(tag, props, "...")` 等
 - JSON 只替換「值」、不動 key；`nls.messages.json` 與 `*.nls.json` 全部替換
 - HTML 替換文字節點與 `title` / `placeholder` / `aria-label` / `alt` 屬性
-- 不修改 `node_modules/`、`package.json`，以及 asar 的 unpacked 原生模組
+- 不修改 `node_modules/`、`__mocks__/`、`package.json`，以及 asar 的 unpacked 原生模組
 
 因此 `--dry-run` 顯示的覆蓋率是「詞庫中有多少條在這個版本的檔案裡被找到」，會隨 Antigravity 版本而變化。
 
