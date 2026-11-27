@@ -6,8 +6,12 @@ import { pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setBackground, setPreset } from '../src/core/background.js';
+import { BACKGROUND_PRESETS } from '../src/core/presets.js';
 import {
   HOOK_BEGIN,
+  HOOK_VERSION,
+  buildHook,
   HOOK_END,
   RUNTIME_FILE_NAME,
   RUNTIME_MARKER,
@@ -386,6 +390,76 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     wc.url = 'file:///app/settings.html';
     wc.emit('dom-ready');
     expect(wc.injected).toHaveLength(2);
+  });
+
+  it('掛鉤 v3 內嵌完整的預設表', () => {
+    expect(HOOK_VERSION).toBe(3);
+    for (const format of ['cjs', 'esm'] as const) {
+      const hook = buildHook(format);
+      expect(hook).toContain(`/* antigravity-i18n:hook-version ${HOOK_VERSION} */`);
+      expect(hook).toContain('var __agi18nPresets = ');
+      for (const [name, p] of Object.entries(BACKGROUND_PRESETS)) expect(hook).toContain(JSON.stringify(name) + ':' + JSON.stringify(p.image));
+      expect(hook).toContain('bgCache, __agi18nPresets)');
+    }
+  });
+
+  it('預設 + 遮罩：dom-ready 時注入漸層背景，切換預設不需重新打包', () => {
+    const toolHome = process.env.ANTIGRAVITY_I18N_HOME!;
+    setPreset(toolHome, 'aurora', { wsl: null, opacity: '0.2', tint: 'rgba(0,0,0,0.25)' });
+    const main = makeApp('cjs');
+    createRequire(main)(main);
+    const win = fakeWc('window');
+    app.emit('web-contents-created', {}, win);
+    win.emit('dom-ready');
+    expect(win.injected).toHaveLength(2);
+    expect(win.injected[0]).toBe(script);
+    const bg = win.injected[1]!;
+    expect(bg).toContain('"kind":"preset"');
+    expect(bg).toContain('"preset":"aurora"');
+    expect(bg).toContain('"tint":"rgba(0,0,0,0.25)"');
+    expect(bg).toContain(JSON.stringify(BACKGROUND_PRESETS.aurora!.image));
+
+    // 在 jsdom 執行實際注入的兩段腳本：翻譯與背景圖都生效
+    const dom = new JSDOM('<html><head></head><body><button id="b">Settings</button></body></html>', { runScripts: 'outside-only' });
+    for (const js of win.injected) dom.window.eval(js);
+    const d = dom.window.document;
+    expect(d.getElementById('b')!.textContent).toBe('設定');
+    const css = d.getElementById('antigravity-i18n-bg-style')!.textContent!;
+    expect(css).toContain('linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.25)), radial-gradient(');
+    expect(d.getElementById('antigravity-i18n-bg')!.getAttribute('data-preset')).toBe('aurora');
+
+    // 換預設：下一次載入即生效，不需要重新打包 app.asar
+    setPreset(toolHome, 'forest', { wsl: null, blur: '6' });
+    win.emit('dom-ready');
+    expect(win.injected[3]).toContain('"preset":"forest"');
+    expect(win.injected[3]).toContain('"blur":6');
+    expect(win.injected[3]).not.toContain('"tint"');
+  });
+
+  it('從預設切回圖片', () => {
+    const toolHome = process.env.ANTIGRAVITY_I18N_HOME!;
+    setPreset(toolHome, 'nebula', { wsl: null });
+    const main = makeApp('cjs');
+    createRequire(main)(main);
+    const win = fakeWc('window');
+    app.emit('web-contents-created', {}, win);
+    win.emit('dom-ready');
+    expect(win.injected[1]).toContain('"preset":"nebula"');
+    const img = write(path.join(dir, 'pic.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2]));
+    setBackground(toolHome, img, { wsl: null });
+    win.emit('dom-ready');
+    expect(win.injected[3]).toContain('"kind":"image"');
+    expect(win.injected[3]).toContain('url(\\"data:image/png;base64,');
+  });
+
+  it('ESM 掛鉤同樣支援預設', async () => {
+    setPreset(process.env.ANTIGRAVITY_I18N_HOME!, 'midnight', { wsl: null });
+    const main = makeApp('esm');
+    await import(pathToFileURL(main).href);
+    const win = fakeWc('window');
+    app.emit('web-contents-created', {}, win);
+    win.emit('dom-ready');
+    expect(win.injected[1]).toContain('"preset":"midnight"');
   });
 
   it('ESM：以 import.meta.url 讀取 runtime 並注入', async () => {

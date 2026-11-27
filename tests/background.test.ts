@@ -5,7 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { bgClearCommand, bgSetCommand, bgStatusCommand, bgToggleCommand, hookHint } from '../src/commands/bg.js';
+import {
+  bgClearCommand,
+  bgPresetCommand,
+  bgPresetsCommand,
+  bgSetCommand,
+  bgStatusCommand,
+  bgToggleCommand,
+  hookHint,
+} from '../src/commands/bg.js';
 import { writeManifest, manifestPathFor } from '../src/core/backup.js';
 import {
   BACKGROUND_DEFAULTS,
@@ -19,15 +27,19 @@ import {
   parseOpacity,
   parsePosition,
   parseSize,
+  parseTint,
+  presetNames,
   readBackgroundConfig,
   resolveWindowsHome,
   setBackground,
   setBackgroundEnabled,
+  setPreset,
   validateImage,
   windowsToWslPath,
   wslToWindowsPath,
   type WslContext,
 } from '../src/core/background.js';
+import { BACKGROUND_PRESETS, presetImages } from '../src/core/presets.js';
 import { HOOK_VERSION, RUNTIME_FILE_NAME, buildRuntimeScript, injectHook } from '../src/core/runtime.js';
 import { applyBackground, readBackgroundPayload, type BackgroundPayload } from '../src/runtime/background.js';
 import type { Manifest } from '../src/types.js';
@@ -146,8 +158,9 @@ describe('WSL 路徑轉換', () => {
     const fail = (): string => {
       throw new Error('no interop');
     };
+    const yes = (): boolean => true;
     expect(resolveWindowsHome(pe({ ANTIGRAVITY_I18N_WIN_HOME: 'C:\\Users\\Me' }), fail)).toBe('/mnt/c/Users/Me');
-    expect(resolveWindowsHome(pe({}), () => 'C:\\Users\\Bob\r\n')).toBe('/mnt/c/Users/Bob');
+    expect(resolveWindowsHome(pe({}), () => 'C:\\Users\\Bob\r\n', yes)).toBe('/mnt/c/Users/Bob');
     expect(resolveWindowsHome(pe({}, ['Solo']), fail)).toBe('/mnt/c/Users/Solo');
     expect(resolveWindowsHome(pe({}, ['A', 'B']), fail)).toBeNull();
   });
@@ -191,6 +204,7 @@ describe('設定檔', () => {
     expect(readBackgroundConfig(home)).toEqual({
       schemaVersion: 1,
       enabled: true,
+      kind: 'image',
       imagePath: p,
       mime: 'image/png',
       ...BACKGROUND_DEFAULTS,
@@ -306,7 +320,8 @@ describe('主行程：readBackgroundPayload', () => {
   it('讀取設定並轉成 data URL', () => {
     setBackground(home, image('w.webp'), { ...NO_WSL, opacity: '0.4', blur: '2', position: 'top left' });
     expect(read()).toEqual({
-      dataUrl: `data:image/webp;base64,${PNG.toString('base64')}`,
+      kind: 'image',
+      image: `url("data:image/webp;base64,${PNG.toString('base64')}")`,
       opacity: 0.4,
       blur: 2,
       size: 'cover',
@@ -332,7 +347,7 @@ describe('主行程：readBackgroundPayload', () => {
   it('Windows 主行程優先使用 windowsPath', () => {
     const real = image('real.png');
     write(path.join(home, 'background.json'), JSON.stringify({ enabled: true, imagePath: '/mnt/c/nope.png', windowsPath: real }));
-    expect(read(env(), 'win32')?.dataUrl).toMatch(/^data:image\/png;base64,/);
+    expect(read(env(), 'win32')?.image).toMatch(/^url\("data:image\/png;base64,/);
     expect(read(env(), 'linux')).toBeNull();
   });
 
@@ -378,7 +393,8 @@ describe('主行程：readBackgroundPayload', () => {
 
 describe('renderer：applyBackground（jsdom）', () => {
   const payload = (o: Partial<BackgroundPayload> = {}): BackgroundPayload => ({
-    dataUrl: `data:image/png;base64,${PNG.toString('base64')}`,
+    kind: 'image',
+    image: `url("data:image/png;base64,${PNG.toString('base64')}")`,
     opacity: 0.12,
     blur: 0,
     size: 'cover',
@@ -405,7 +421,10 @@ describe('renderer：applyBackground（jsdom）', () => {
     const css = style.textContent!;
     for (const rule of [
       'position:fixed',
-      'inset:0',
+      // blur 5px → 向外延伸 10px，消除四邊虛邊
+      'inset:-10px',
+      'top:-10px',
+      'left:-10px',
       'pointer-events:none',
       'z-index:99999',
       'opacity:0.3',
@@ -445,8 +464,14 @@ describe('renderer：applyBackground（jsdom）', () => {
   });
 
   it('不合法的 payload 不注入任何東西', () => {
-    const doc = inject({ ...payload(), dataUrl: 'javascript:alert(1)' });
-    expect(doc.getElementById('antigravity-i18n-bg')).toBeNull();
+    for (const bad of [
+      { ...payload(), image: 'url("javascript:alert(1)")' },
+      { ...payload(), image: 'url(https://evil.example/x.png)' },
+      { ...payload(), kind: 'preset' as const, image: 'linear-gradient(red, blue);}*{display:none' },
+      { ...payload(), kind: 'preset' as const, image: 'url("data:image/png;base64,AAAA")' },
+    ]) {
+      expect(inject(bad).getElementById('antigravity-i18n-bg')).toBeNull();
+    }
   });
 
   it('與翻譯 runtime 共存：背景圖層被跳過，介面照常翻譯', () => {
@@ -554,5 +579,396 @@ describe('主行程掛鉤：在模擬的 Electron 中載入背景圖', () => {
     expect(wc.injected).toHaveLength(1);
     expect(wc.injected[0]).toContain('antigravity-i18n-bg');
     expect(warn.mock.calls.some((c) => String(c[0]).includes('runtime not loaded'))).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 內建預設、可讀性遮罩、blur 邊緣修正、向下相容（HOOK_VERSION 3）
+// ─────────────────────────────────────────────────────────────
+
+const TINT_OK = [
+  'rgba(0,0,0,0.25)',
+  'rgba(0, 0, 0, .25)',
+  'rgb(0 0 0 / 25%)',
+  'rgb(255,255,255)',
+  'hsl(220deg 50% 10% / 0.3)',
+  'hsla(220, 50%, 10%, 0.3)',
+  'hsl(0.5turn 40% 20%)',
+  '#000',
+  '#0008',
+  '#00000040',
+  '#1E1E1E',
+  'transparent',
+  'black',
+  'WHITE',
+];
+const TINT_BAD = [
+  'red;} body{display:none',
+  'rgba(0,0,0,0.25);}*{display:none}',
+  'rgba(0,0,0,0.25)) , url(x)',
+  'url(https://evil.example/x.png)',
+  'var(--x)',
+  'expression(alert(1))',
+  'rgb()',
+  'rgba(0,0,0',
+  'rgb(calc(1),0,0)',
+  '#12345',
+  '#ggg',
+  'red',
+  'blue !important',
+  '"#000"',
+  `rgba(${'1,'.repeat(40)}1)`,
+];
+
+describe('內建漸層預設', () => {
+  it('至少 5 款，皆有中文名稱與說明', () => {
+    expect(presetNames()).toEqual(expect.arrayContaining(['aurora', 'nebula', 'sunset', 'midnight', 'forest']));
+    expect(presetNames().length).toBeGreaterThanOrEqual(5);
+    expect(BACKGROUND_PRESETS.aurora!.label).toBe('極光');
+    expect(BACKGROUND_PRESETS.nebula!.label).toBe('星雲');
+    expect(BACKGROUND_PRESETS.sunset!.label).toBe('霓虹夕陽');
+    expect(BACKGROUND_PRESETS.midnight!.label).toBe('深夜藍');
+    expect(BACKGROUND_PRESETS.forest!.label).toBe('靜謐森林');
+  });
+
+  it.each(Object.entries(BACKGROUND_PRESETS))('%s：純 CSS 漸層、只含安全字元、無外部資源', (_name, p) => {
+    expect(p.description.length).toBeGreaterThan(4);
+    expect(p.image).toMatch(/^[A-Za-z0-9#%.,()\s-]+$/);
+    expect(p.image).toMatch(/gradient\(/);
+    expect(p.image).not.toMatch(/url\(|var\(|;|\{|\}|"|'/);
+  });
+
+  it('presetImages 與預設表一致', () => {
+    expect(Object.keys(presetImages())).toEqual(presetNames());
+    for (const [n, img] of Object.entries(presetImages())) expect(img).toBe(BACKGROUND_PRESETS[n]!.image);
+  });
+
+  it('setPreset 寫入同一份 background.json（不含圖片欄位）', () => {
+    const r = setPreset(home, 'Aurora', { ...NO_WSL, opacity: '0.3', blur: '6', tint: 'rgba(0,0,0,0.25)', mode: 'underlay', now: new Date(0) });
+    expect(r.file).toBe(path.join(home, 'background.json'));
+    expect(readBackgroundConfig(home)).toEqual({
+      schemaVersion: 1,
+      enabled: true,
+      kind: 'preset',
+      preset: 'aurora',
+      opacity: 0.3,
+      blur: 6,
+      size: 'cover',
+      position: 'center',
+      mode: 'underlay',
+      tint: 'rgba(0,0,0,0.25)',
+      updatedAt: new Date(0).toISOString(),
+    });
+    expect(backgroundStatus(home, NO_WSL)).toMatchObject({ presetKnown: true, imageExists: false });
+  });
+
+  it('未知的預設與無效參數會被拒絕，且不寫入設定檔', () => {
+    expect(() => setPreset(home, 'rainbow', NO_WSL)).toThrow(/未知的預設「rainbow」.*aurora/);
+    expect(() => setPreset(home, '__proto__', NO_WSL)).toThrow(/未知的預設/);
+    expect(() => setPreset(home, 'aurora', { ...NO_WSL, opacity: '3' })).toThrow(/--opacity/);
+    expect(() => setPreset(home, 'aurora', { ...NO_WSL, tint: 'red;}' })).toThrow(/--tint/);
+    expect(fs.existsSync(path.join(home, 'background.json'))).toBe(false);
+  });
+
+  it('在圖片與預設之間切換', () => {
+    setBackground(home, image(), NO_WSL);
+    setPreset(home, 'forest', NO_WSL);
+    const cfg = readBackgroundConfig(home)!;
+    expect(cfg.kind).toBe('preset');
+    expect(cfg.imagePath).toBeUndefined();
+    setBackground(home, image(), NO_WSL);
+    expect(readBackgroundConfig(home)).toMatchObject({ kind: 'image', imagePath: expect.any(String) });
+    expect(readBackgroundConfig(home)!.preset).toBeUndefined();
+  });
+
+  it('WSL：預設同樣鏡像到 Windows 家目錄', () => {
+    const wsl: WslContext = { distro: 'Ubuntu', windowsHome: path.join(dir, 'winhome') };
+    const r = setPreset(home, 'nebula', { wsl });
+    expect(r.mirror).toBeDefined();
+    expect(fs.readFileSync(r.mirror!, 'utf8')).toBe(fs.readFileSync(r.file, 'utf8'));
+    expect(JSON.parse(fs.readFileSync(r.mirror!, 'utf8')).preset).toBe('nebula');
+  });
+});
+
+describe('可讀性遮罩 --tint', () => {
+  it.each(TINT_OK)('接受：%s', (v) => {
+    expect(parseTint(v)).toBe(v.trim());
+  });
+
+  it.each(TINT_BAD)('拒絕（防 CSS 注入）：%s', (v) => {
+    expect(() => parseTint(v)).toThrow(/--tint/);
+  });
+
+  it('未提供或 none 表示不套用', () => {
+    expect(parseTint(undefined)).toBeUndefined();
+    expect(parseTint('none')).toBeUndefined();
+    expect(parseTint(' NONE ')).toBeUndefined();
+  });
+
+  it('bg set --tint 寫入設定；--tint none 清除', () => {
+    setBackground(home, image(), { ...NO_WSL, tint: '#00000040' });
+    expect(readBackgroundConfig(home)!.tint).toBe('#00000040');
+    setBackground(home, image(), { ...NO_WSL, tint: 'none' });
+    expect('tint' in readBackgroundConfig(home)!).toBe(false);
+  });
+
+  it('CLI、主行程、renderer 三端的 tint 驗證規則一致', () => {
+    const env = { ANTIGRAVITY_I18N_HOME: home };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    for (const v of [...TINT_OK, ...TINT_BAD]) {
+      let cli = true;
+      try {
+        parseTint(v);
+      } catch {
+        cli = false;
+      }
+      // 主行程：直接寫入（模擬手動編輯的設定檔）
+      write(path.join(home, 'background.json'), JSON.stringify({ enabled: true, kind: 'preset', preset: 'midnight', tint: v }));
+      const main = readBackgroundPayload(fs, path, os, env, 'linux', undefined, presetImages())?.tint === v;
+      // renderer：直接收到含該 tint 的 payload
+      const dom = new JSDOM('<html><head></head><body></body></html>', { runScripts: 'outside-only' });
+      const payload = { kind: 'preset', image: BACKGROUND_PRESETS.midnight!.image, tint: v, opacity: 0.2, blur: 0, size: 'cover', position: 'center', mode: 'overlay' };
+      dom.window.eval(`(${applyBackground.toString()})(${JSON.stringify(payload)});`);
+      const renderer = dom.window.document.getElementById('antigravity-i18n-bg-style')!.textContent!.includes(`linear-gradient(${v}, ${v})`);
+      expect([v, main, renderer]).toEqual([v, cli, cli]);
+    }
+    warn.mockRestore();
+  });
+});
+
+describe('向下相容：PR #2 版本寫入的 background.json（沒有 kind 欄位）', () => {
+  /** 與 PR #2 版本 setBackground() 輸出的格式完全相同 */
+  const legacy = (imagePath: string): string =>
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        enabled: true,
+        imagePath,
+        mime: 'image/png',
+        opacity: 0.2,
+        blur: 4,
+        size: 'contain',
+        position: 'top right',
+        mode: 'overlay',
+        updatedAt: '2026-11-27T15:15:21.389Z',
+      },
+      null,
+      2,
+    )}\n`;
+
+  it('CLI 讀取為圖片設定', () => {
+    const p = image();
+    write(path.join(home, 'background.json'), legacy(p));
+    expect(readBackgroundConfig(home)).toMatchObject({ kind: 'image', imagePath: p, opacity: 0.2, blur: 4 });
+    expect(backgroundStatus(home, NO_WSL)).toMatchObject({ imageExists: true });
+  });
+
+  it('主行程照常載入圖片，參數完全保留', () => {
+    const p = image();
+    write(path.join(home, 'background.json'), legacy(p));
+    expect(readBackgroundPayload(fs, path, os, { ANTIGRAVITY_I18N_HOME: home }, 'linux', undefined, presetImages())).toEqual({
+      kind: 'image',
+      image: `url("data:image/png;base64,${PNG.toString('base64')}")`,
+      opacity: 0.2,
+      blur: 4,
+      size: 'contain',
+      position: 'top right',
+      mode: 'overlay',
+      tint: undefined,
+    });
+  });
+
+  it('bg off / on 保留舊設定的所有欄位', () => {
+    const p = image();
+    write(path.join(home, 'background.json'), legacy(p));
+    setBackgroundEnabled(home, false, NO_WSL);
+    setBackgroundEnabled(home, true, NO_WSL);
+    expect(readBackgroundConfig(home)).toMatchObject({ enabled: true, imagePath: p, size: 'contain', position: 'top right', blur: 4 });
+  });
+});
+
+describe('主行程：預設與 tint', () => {
+  const read = (presets: Record<string, string> | null = presetImages()): BackgroundPayload | null =>
+    readBackgroundPayload(fs, path, os, { ANTIGRAVITY_I18N_HOME: home }, 'linux', undefined, presets ?? undefined);
+
+  it('依名稱查內建漸層表', () => {
+    setPreset(home, 'sunset', { ...NO_WSL, opacity: '0.25', tint: 'rgba(0,0,0,0.3)' });
+    expect(read()).toEqual({
+      kind: 'preset',
+      image: BACKGROUND_PRESETS.sunset!.image,
+      preset: 'sunset',
+      tint: 'rgba(0,0,0,0.3)',
+      opacity: 0.25,
+      blur: 0,
+      size: 'cover',
+      position: 'center',
+      mode: 'overlay',
+    });
+  });
+
+  it('未知預設、或掛鉤內沒有預設表（舊版掛鉤）時只警告', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    write(path.join(home, 'background.json'), JSON.stringify({ enabled: true, kind: 'preset', preset: 'rainbow' }));
+    expect(read()).toBeNull();
+    setPreset(home, 'aurora', NO_WSL);
+    expect(read(null)).toBeNull();
+    write(path.join(home, 'background.json'), JSON.stringify({ enabled: true, kind: 'preset', preset: 'toString' }));
+    expect(read()).toBeNull();
+    expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+      expect.stringContaining('未知的預設「rainbow」'),
+      expect.stringContaining('apply --force'),
+      expect.stringContaining('未知的預設「toString」'),
+    ]);
+  });
+
+  it('預設表被竄改成不安全的 CSS 時拒絕', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    setPreset(home, 'aurora', NO_WSL);
+    expect(read({ aurora: 'linear-gradient(red, blue);}*{display:none' })).toBeNull();
+    expect(read({ aurora: 'url(https://evil.example/x.png)' })).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it('手動寫入不安全的 tint 時忽略遮罩，背景照常顯示', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    write(path.join(home, 'background.json'), JSON.stringify({ enabled: true, kind: 'preset', preset: 'forest', tint: 'red;}*{display:none' }));
+    const p = read()!;
+    expect(p.preset).toBe('forest');
+    expect(p.tint).toBeUndefined();
+    expect(String(warn.mock.calls[0]?.[0])).toContain('不安全的 tint');
+  });
+});
+
+describe('renderer：預設、tint 與 blur 邊緣修正（jsdom）', () => {
+  const run = (p: Partial<BackgroundPayload>): { doc: Document; css: string } => {
+    const full = { kind: 'preset', image: BACKGROUND_PRESETS.aurora!.image, preset: 'aurora', opacity: 0.2, blur: 0, size: 'cover', position: 'center', mode: 'overlay', ...p };
+    const dom = new JSDOM('<html><head></head><body></body></html>', { runScripts: 'outside-only' });
+    dom.window.eval(`(${applyBackground.toString()})(${JSON.stringify(full)});`);
+    const doc = dom.window.document;
+    return { doc, css: doc.getElementById('antigravity-i18n-bg-style')?.textContent ?? '' };
+  };
+
+  it('預設：注入漸層，圖層帶 data-preset 與保護屬性', () => {
+    const { doc, css } = run({});
+    const layer = doc.getElementById('antigravity-i18n-bg')!;
+    expect(layer.getAttribute('data-preset')).toBe('aurora');
+    expect(layer.hasAttribute('data-antigravity-i18n-skip')).toBe(true);
+    expect(css).toContain(`background-image:${BACKGROUND_PRESETS.aurora!.image};`);
+    expect(css).toContain('pointer-events:none');
+    expect(css).not.toContain('url(');
+  });
+
+  it('tint：以單色漸層疊在背景之上，尺寸與位置一一對應', () => {
+    const { css } = run({ tint: 'rgba(0,0,0,0.25)' });
+    expect(css).toContain(`background-image:linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.25)), ${BACKGROUND_PRESETS.aurora!.image};`);
+    expect(css).toContain('background-size:100% 100%, cover;');
+    expect(css).toContain('background-position:center, center;');
+  });
+
+  it('沒有 tint 時不加遮罩層', () => {
+    expect(run({}).css).not.toContain('100% 100%');
+    // renderer 也會拒絕不安全的 tint，只顯示背景
+    const { css } = run({ tint: 'red;}*{display:none' });
+    expect(css).not.toContain('display:none');
+    expect(css).toContain(`background-image:${BACKGROUND_PRESETS.aurora!.image};`);
+  });
+
+  it.each([
+    [0, '0'],
+    [1, '-2px'],
+    [8, '-16px'],
+    [100, '-200px'],
+  ])('blur %ipx → 圖層向外延伸 %s，消除四邊虛邊', (blur, edge) => {
+    const { css } = run({ blur });
+    expect(css).toContain(`inset:${edge};top:${edge};right:${edge};bottom:${edge};left:${edge};`);
+    expect(css).toContain(blur > 0 ? `filter:blur(${blur}px)` : 'filter:none');
+  });
+
+  it('blur 超過 100 時以 100 計算', () => {
+    expect(run({ blur: 999 }).css).toContain('inset:-200px');
+  });
+});
+
+describe('resolveWindowsHome：非 UTF-8 中文 Windows', () => {
+  const pe = (users?: string[]) => ({ platform: 'linux' as const, home: '/home/u', env: {}, wslWindowsUsers: users });
+
+  it('先切換 UTF-8 codepage 再查詢 %USERPROFILE%', () => {
+    const calls: string[][] = [];
+    const out = resolveWindowsHome(
+      pe(),
+      (cmd, args) => {
+        calls.push([cmd, ...args]);
+        return 'C:\\Users\\王小明\r\n';
+      },
+      (p) => p === '/mnt/c/Users/王小明',
+    );
+    expect(calls).toEqual([['cmd.exe', '/d', '/c', 'chcp 65001 >nul & echo %USERPROFILE%']]);
+    expect(out).toBe('/mnt/c/Users/王小明');
+  });
+
+  it('轉換後的目錄不存在（例如亂碼）時不採用，改用唯一使用者', () => {
+    const garbled = (): string => 'C:\\Users\\���p��\r\n';
+    expect(resolveWindowsHome(pe(['王小明']), garbled, () => false)).toBe('/mnt/c/Users/王小明');
+    expect(resolveWindowsHome(pe(['A', 'B']), garbled, () => false)).toBeNull();
+  });
+});
+
+describe('bg preset / presets 指令與掛鉤升級提示', () => {
+  let lines: string[];
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    lines = [];
+    vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void lines.push(a.join(' ').replace(/\x1b\[[0-9;]*m/g, '')));
+    for (const k of ['ANTIGRAVITY_I18N_HOME', 'ANTIGRAVITY_I18N_WIN_HOME']) saved[k] = process.env[k];
+    process.env.ANTIGRAVITY_I18N_HOME = home;
+    process.env.ANTIGRAVITY_I18N_WIN_HOME = path.posix.join('/', ...path.join(dir, 'winhome').split(path.sep).filter(Boolean));
+  });
+  afterEach(() => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  it('bg presets 列出所有預設與中文說明', async () => {
+    expect(await bgPresetsCommand()).toBe(0);
+    const out = lines.join('\n');
+    for (const [name, p] of Object.entries(BACKGROUND_PRESETS)) {
+      expect(out).toContain(name);
+      expect(out).toContain(p.label);
+      expect(out).toContain(p.description);
+    }
+  });
+
+  it('bg preset 寫入設定，bg status 顯示預設與遮罩', async () => {
+    expect(await bgPresetCommand('midnight', { opacity: '0.18', tint: '#00000040', mode: 'overlay' })).toBe(0);
+    expect(lines.join('\n')).toContain('已套用背景預設：midnight（深夜藍）');
+    lines.length = 0;
+    await bgStatusCommand();
+    const out = lines.join('\n');
+    expect(out).toContain('預設：midnight（深夜藍）');
+    expect(out).toContain('遮罩：#00000040');
+    expect(out).not.toContain('圖片：');
+    await expect(bgPresetCommand('nope', {})).rejects.toThrow(/未知的預設/);
+  });
+
+  it('v2 掛鉤提示升級以支援預設與遮罩', () => {
+    const m: Manifest = {
+      schemaVersion: 1,
+      tool: 'antigravity-i18n',
+      toolVersion: '0',
+      target: 'app',
+      lang: 'zh-TW',
+      kind: 'asar',
+      installRoot: '/opt/Antigravity',
+      appliedAt: '',
+      backupDir: '',
+      files: [],
+      stats: { totalKeys: 0, matchedKeys: 0, totalHits: 0, coverage: 0 },
+      runtime: { entries: 1, mainEntry: 'dist/main.js', runtimeFile: 'dist/x.js', hookVersion: 2 },
+    };
+    writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), m);
+    expect(HOOK_VERSION).toBe(3);
+    expect(hookHint(home)).toMatch(/v2.*v3.*bg preset.*--tint.*--force/);
   });
 });

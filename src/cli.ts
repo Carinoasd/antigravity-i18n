@@ -2,7 +2,14 @@
 import { Argument, Command, Option } from 'commander';
 import pc from 'picocolors';
 import { applyCommand } from './commands/apply.js';
-import { bgClearCommand, bgSetCommand, bgStatusCommand, bgToggleCommand } from './commands/bg.js';
+import {
+  bgClearCommand,
+  bgPresetCommand,
+  bgPresetsCommand,
+  bgSetCommand,
+  bgStatusCommand,
+  bgToggleCommand,
+} from './commands/bg.js';
 import { CliError } from './commands/common.js';
 import { restoreCommand } from './commands/restore.js';
 import { rulesCommand } from './commands/rules.js';
@@ -93,7 +100,10 @@ const bg = program
 範例：
   $ antigravity-i18n bg set ~/Pictures/wallpaper.jpg
   $ antigravity-i18n bg set ./bg.png --opacity 0.2 --blur 4 --size contain --position "top right"
-  $ antigravity-i18n bg set /mnt/c/Users/me/Pictures/bg.webp --mode underlay
+  $ antigravity-i18n bg set /mnt/c/Users/me/Pictures/bg.webp --mode underlay --tint "rgba(0,0,0,0.25)"
+  $ antigravity-i18n bg presets
+  $ antigravity-i18n bg preset aurora --opacity 0.2
+  $ antigravity-i18n bg preset midnight --tint "#00000040"
   $ antigravity-i18n bg off
   $ antigravity-i18n bg status
 
@@ -107,7 +117,16 @@ bg.command('set <imagePath>')
   .addOption(new Option('--size <size>', '背景尺寸').choices(['cover', 'contain', 'auto']).default('cover'))
   .option('--position <cssPosition>', 'CSS background-position，例如 center、top right、50% 20%', 'center')
   .addOption(new Option('--mode <mode>', 'overlay：覆蓋在介面上（不擋點擊）；underlay：放在介面底層').choices(['overlay', 'underlay']).default('overlay'))
+  .option('--tint <cssColor>', '可讀性遮罩顏色，例如 "rgba(0,0,0,0.25)"、"#00000040"；none 表示不套用')
   .action(async (imagePath: string, opts) => run(() => bgSetCommand(imagePath, opts)));
+bg.command('preset <name>')
+  .description('套用內建的純 CSS 漸層預設（不需圖片檔）')
+  .option('--opacity <0.01-1>', '不透明度', '0.12')
+  .option('--blur <px>', '模糊程度（像素）', '0')
+  .option('--tint <cssColor>', '可讀性遮罩顏色；none 表示不套用')
+  .addOption(new Option('--mode <mode>', 'overlay 或 underlay').choices(['overlay', 'underlay']).default('overlay'))
+  .action(async (name: string, opts) => run(() => bgPresetCommand(name, opts)));
+bg.command('presets').description('列出所有內建背景預設').action(async () => run(() => bgPresetsCommand()));
 bg.command('status').description('顯示背景圖設定與狀態').action(async () => run(() => bgStatusCommand()));
 bg.command('on').description('啟用背景圖').action(async () => run(() => bgToggleCommand(true)));
 bg.command('off').description('暫時停用背景圖（保留設定）').action(async () => run(() => bgToggleCommand(false)));
