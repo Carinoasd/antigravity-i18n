@@ -194,6 +194,19 @@ await step('apply + bg preset，並在模擬的 Electron 與 jsdom 中執行注�
   doc.querySelector('[data-agi18n="scan"]').click();
   assert(doc.querySelector('[data-agi18n="scan-count"]').textContent === '找到 1 筆', `掃描結果：${doc.querySelector('[data-agi18n="scan-count"]').textContent}`);
   assert(JSON.parse(dom.window.__ANTIGRAVITY_I18N_PANEL__.scanJson())['Smoke untranslated label'] === '', 'scanJson 格式錯誤');
+
+  // 四語 runtime：面板內免重整切換五語，切回英文時還原原文
+  const ov = dom.window.__ANTIGRAVITY_I18N__;
+  assert(ov.availableLangs.join(',') === 'zh-TW,zh-CN,ja,ko,en', `availableLangs：${ov.availableLangs}`);
+  const btn = doc.getElementById('b');
+  const seen = ['zh-CN', 'ja', 'ko', 'en', 'zh-TW'].map((l) => (ov.setLang(l), btn.textContent));
+  assert(seen.join('|') === '设置|設定|설정|Settings|設定', `五語切換結果：${seen.join('|')}`);
+  // 外觀微調：獨立的 <style>，開關立即注入／移除
+  const panelHandle = dom.window.__ANTIGRAVITY_I18N_PANEL__;
+  panelHandle.setPrefs({ cjkFont: true, glass: true });
+  assert(doc.getElementById('antigravity-i18n-font') && doc.getElementById('antigravity-i18n-glass'), '外觀微調樣式沒有注入');
+  panelHandle.setPrefs({ cjkFont: false, glass: false });
+  assert(!doc.getElementById('antigravity-i18n-font') && !doc.getElementById('antigravity-i18n-glass'), '外觀微調樣式沒有移除');
 });
 
 // macOS 的 launch 會呼叫系統的 open -a，冒煙測試只在 Linux / Windows 實際啟動假的執行檔

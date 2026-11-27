@@ -55,6 +55,12 @@ npm run smoke:sea -- dist-sea/antigravity-i18n-<平台>-<架構>
   - `src/runtime/panel.ts`：介面內背景設定面板（`Ctrl + Alt + B` / macOS `Cmd + Option + B`）。
     掛鉤組合腳本時把 `applyBackground` 以參數傳入（不可直接引用）；設定存於 IndexedDB `antigravity-i18n`。
     「掃描未翻譯英文」的保護區清單（`PROTECTED`）必須與 `overlay.ts` 逐字相同（測試會比對），且絕不讀取表單欄位內容。
+    IndexedDB 版本為 2（`settings` + `gallery`），升級時不可刪除或改動既有 store。桌布收藏夾的硬上限（單張 ≤ 10 MB、最多 12 張、總容量 ≤ 30 MB）不可放寬；
+    平時只在記憶體保留目前這一張圖片，縮圖只在面板開啟時以游標逐筆讀取、關閉即釋放。定時輪播同一時間只能有一個 `setInterval`，變更模式前必須先清除。
+    外觀微調（`#antigravity-i18n-font`、`#antigravity-i18n-glass`）各自是獨立的 `<style>` 並帶 `data-antigravity-i18n-skip`；字型只設定在 body 與表單控制項，
+    不可覆寫程式碼、編輯器、終端機與 mono 類別的等寬字型。
+  - 多語系 runtime：app 的 runtime 以共享 key 的 `{ keys, langs }` 結構打包四語（`buildRuntimePack`），靜態層一律只用 apply 的語系；`--lang none` 不寫入翻譯 runtime。
+    `overlay.ts` 以 `WeakMap` 記住英文原文，`setLang()` 先還原再重譯；語系偏好 `antigravity-i18n:lang` 與舊旗標 `antigravity-i18n:i18n-disabled` 必須同時維護（測試會比對字串）。
   - `src/core/launcher.ts`：智慧啟動器（`launch`）。**不可**加入任何常駐監控或 daemon：只在啟動當下檢查一次。
     啟動指令以純函式 `launchCommandFor` 產生、`spawn` 可注入；`FileLockError` 只提示並略過重新套用，不可中斷啟動。
     雜湊快取存於工具資料目錄的 `launch-state.json`（只影響速度，損毀時重新計算）。

@@ -124,6 +124,7 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --opacity 0.2 --blur 4
 
 - The background is read by the App's main-process hook on every window load, so changing it **never requires re-patching** — just reopen or reload the window.
 - Inside Antigravity, **`Ctrl + Alt + B`** (macOS `Cmd + Option + B`) opens the in-app panel; on **Settings → Appearance** a small "Background" button also appears. Panel settings (including the chosen image) are stored in the app's **IndexedDB** and take priority over the CLI `background.json`; "Reset" goes back to the CLI settings.
+- The panel also has a **wallpaper gallery** (≤ 10 MB per image, up to 12 images, 30 MB in total) with a **slideshow** (off / every window launch / every 15, 30 or 60 minutes), **appearance tweaks** (CJK UI font stack and a glassmorphism card mode, both off by default and never touching monospace code fonts), and an **instant language switcher** (繁體中文 / 简体中文 / 日本語 / 한국어 / English) that re-translates the page without a reload.
 - Images: PNG / JPEG / WebP / GIF, up to **10 MB**. `--tint` only accepts safe CSS colors (`#hex`, `rgb()`, `rgba()`, `hsl()`, `hsla()`, `transparent`, `black`, `white`, `none`).
 - The background layer is `pointer-events: none` and never blocks clicks; code, editors, terminals, inputs and AI replies are never translated.
 - **WSL**: settings are mirrored to the Windows home (`C:\Users\<you>\.antigravity-i18n`) so the Windows build of Antigravity can read them.

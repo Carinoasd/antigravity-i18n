@@ -1,6 +1,6 @@
 import pc from 'picocolors';
 import { formatFsError } from '../core/errors.js';
-import { loadDictionary, readToolVersion } from '../core/locales.js';
+import { loadDictionary, loadRuntimeDicts, readToolVersion } from '../core/locales.js';
 import { applyTarget, type ApplyResult } from '../core/patcher.js';
 import { TARGET_LABELS, TARGET_MODULES } from '../types.js';
 import { CliError, getToolHome, langLabel, parseApplyLang, parseTargets, pct, resolveTargets, sym, warn } from './common.js';
@@ -106,6 +106,8 @@ export async function applyCommand(opts: ApplyOptions): Promise<number> {
         force: opts.force,
         toolVersion,
         runtime: opts.runtime !== false,
+        // app：四語一併打包進 runtime，介面面板可免重整切換
+        runtimeDicts: id === 'app' && lang !== 'none' && opts.runtime !== false ? loadRuntimeDicts(TARGET_MODULES.app) : undefined,
       });
     } catch (e) {
       failures++;

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import pc from 'picocolors';
 import { detectTarget, isWsl } from '../config/paths.js';
-import { loadDictionary, readToolVersion } from '../core/locales.js';
+import { loadDictionary, loadRuntimeDicts, readToolVersion } from '../core/locales.js';
 import { LaunchError, smartLaunch, type LaunchDeps, type LaunchResult } from '../core/launcher.js';
 import { TARGET_MODULES, type ApplyLang } from '../types.js';
 import { CliError, getToolHome, langLabel, parseApplyLang, sym, warn } from './common.js';
@@ -26,6 +26,7 @@ export function defaultLaunchDeps(): LaunchDeps {
     toolVersion: readToolVersion(),
     detect: (customPath) => detectTarget('app', { customPath }),
     loadDict: (lang) => loadDictionary(lang, TARGET_MODULES.app),
+    loadRuntimeDicts: () => loadRuntimeDicts(TARGET_MODULES.app),
     env: { platform: process.platform, wsl: isWsl(), exists: (p) => fs.existsSync(p) },
   };
 }

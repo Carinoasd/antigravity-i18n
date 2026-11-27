@@ -124,6 +124,7 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --opacity 0.2 --blur 4
 
 - 背景由 App 主进程挂钩在每次窗口加载时读取，**换背景无需重新应用**，重新打开或刷新窗口即可。
 - 在 Antigravity 里按 **`Ctrl + Alt + B`**（macOS `Cmd + Option + B`）打开界面内面板；进入「设置 → 外观（Appearance）」时右下角也会出现「背景设置」小按钮。面板中的设置（含选择的图片）保存在应用本地的 **IndexedDB**，优先于 CLI 的 `background.json`；点击「重置」即回到 CLI 设置。
+- 面板还提供**壁纸收藏夹**（单张 ≤ 10 MB、最多 12 张、总容量 30 MB）与**自动轮播**（关闭／每次打开窗口／每 15、30、60 分钟）、**外观微调**（CJK 界面字体优化、毛玻璃卡片模式，默认关闭，不影响代码等宽字体），以及**界面语言即时切换**（繁體中文／简体中文／日本語／한국어／English），无需刷新页面。
 - 图片支持 PNG / JPEG / WebP / GIF，上限 **10 MB**。`--tint` 只接受安全的 CSS 颜色（`#hex`、`rgb()`、`rgba()`、`hsl()`、`hsla()`、`transparent`、`black`、`white`、`none`）。
 - 背景图层为 `pointer-events: none`，不会挡住点击；代码、编辑器、终端、输入框与 AI 回复正文都不会被翻译。
 - **WSL**：设置会同步镜像到 Windows 用户目录（`C:\Users\<你>\.antigravity-i18n`），让 Windows 版 Antigravity 读得到。

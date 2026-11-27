@@ -7,7 +7,7 @@ import { listManifests, manifestPathFor, readManifest, sha256File } from './back
 import { wslToWindowsPath } from './background.js';
 import { FileLockError, formatFsError } from './errors.js';
 import { applyTarget, type ApplyResult } from './patcher.js';
-import { HOOK_VERSION } from './runtime.js';
+import { HOOK_VERSION, type RuntimeDicts } from './runtime.js';
 
 /**
  * 智慧啟動器：`antigravity-i18n launch`。
@@ -264,6 +264,8 @@ export interface LaunchDeps {
   toolVersion: string;
   detect: (customPath?: string) => DetectedTarget | null;
   loadDict: (lang: Exclude<ApplyLang, 'none'>) => Dictionary;
+  /** 打包進多語系 runtime 的四語詞庫（未提供時 runtime 只含重新套用的語系） */
+  loadRuntimeDicts?: () => RuntimeDicts;
   env: LaunchEnv;
   spawn?: Spawn;
   archiver?: AsarArchiver;
@@ -343,6 +345,7 @@ export async function smartLaunch(opts: LaunchOptions, deps: LaunchDeps): Promis
             toolVersion: deps.toolVersion,
             // 沿用上次的選擇：以 --no-runtime 套用過的就維持只有靜態層
             runtime: lang === 'none' || manifest.runtime !== undefined,
+            runtimeDicts: lang !== 'none' && manifest.runtime !== undefined ? deps.loadRuntimeDicts?.() : undefined,
             archiver: deps.archiver,
           });
           result.apply = r;

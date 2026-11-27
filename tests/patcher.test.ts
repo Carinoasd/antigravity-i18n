@@ -41,6 +41,16 @@ function makeIde(): { root: string; target: DetectedTarget; workbench: string; n
   return { root, target, workbench, nls, product };
 }
 
+
+/** 從 runtime 檔取出多語系共享 key 的詞庫，查詢單一詞條 */
+function runtimeEntry(code: string, lang: string, key: string): string | null | undefined {
+  const m = /\)\((\{"keys":[\s\S]*?\}), \{"lang":/.exec(code);
+  if (!m?.[1]) throw new Error('runtime pack not found');
+  const pack = JSON.parse(m[1]) as { keys: string[]; langs: Record<string, (string | null)[]> };
+  const i = pack.keys.indexOf(key);
+  return i < 0 ? undefined : pack.langs[lang]?.[i];
+}
+
 describe('路徑偵測', () => {
   const pe = (platform: NodeJS.Platform, env: NodeJS.ProcessEnv = {}): PathEnv => ({ platform, home: '/home/u', env });
 
@@ -343,6 +353,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
       runtimeFile: `dist/${RUNTIME_FILE_NAME}`,
       format: 'cjs',
       translation: true,
+      langs: ['zh-TW'],
     });
     expect(r.asarEntries).toEqual([
       { path: 'dist/menu.js', kind: 'static', hits: 2 },
@@ -376,7 +387,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
 
     const runtime = read(asarPath, `dist/${RUNTIME_FILE_NAME}`);
     expect(runtime.startsWith(RUNTIME_MARKER)).toBe(true);
-    expect(runtime).toContain('"Restart Now":"立即重新啟動"');
+    expect(runtimeEntry(runtime, 'zh-TW', 'Restart Now')).toBe('立即重新啟動');
     expect(runtime).toContain('(zh-TW)');
 
     const m = readManifest(r.manifestPath)!;
@@ -395,7 +406,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
     const r = await applyTarget(target, { lang: 'zh-CN', dict: dictCNApp, toolHome: home, force: true });
     expect(r.status).toBe('applied');
     expect(read(asarPath, 'dist/main.js').split(HOOK_BEGIN)).toHaveLength(2);
-    expect(read(asarPath, `dist/${RUNTIME_FILE_NAME}`)).toContain('"Settings":"设置"');
+    expect(runtimeEntry(read(asarPath, `dist/${RUNTIME_FILE_NAME}`), 'zh-CN', 'Settings')).toBe('设置');
     expect(read(asarPath, 'dist/menu.js')).toContain('label:"设置"');
   });
 
