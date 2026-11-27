@@ -10,7 +10,7 @@
 
 | 目標 | 機制 |
 | --- | --- |
-| `app` | `app.asar` 雙層機制：靜態層（主行程選單／系統匣／更新提示）＋執行期 DOM 注入層 |
+| `app` | `app.asar` 雙層機制：靜態層（主行程選單／系統匣／更新提示）＋執行期 DOM 注入層；`--lang none` 為僅背景模式（不翻譯，只掛載背景與 `Ctrl+Alt+B` 面板） |
 | `ide` | 修補 `nls.messages.json`、workbench bundle，並同步 `product.json` checksums |
 | `cli` | 修補 Node.js 版 `agy` 的 JS bundle |
 
@@ -34,6 +34,7 @@ node dist/cli.js validate
 - **TypeScript strict + ESM**（`"type": "module"`）。相對 import 一律寫 `.js` 副檔名。
 - Node.js ≥ 20：不可使用只有 Node 22 才有的 API，新相依套件也必須支援 Node 20。
 - **新增執行期相依套件前先討論**；目前只有 `commander`、`picocolors`、`@electron/asar`。
+- `apply --lang none`（`ApplyLang`）：只適用於 app。不做靜態翻譯、不寫入翻譯 runtime，掛鉤以 `{ translate: false }` 產生；manifest 記錄 `lang: "none"`、`runtime.translation: false`。
 - 模組邊界：
   - `src/config/paths.ts`：只負責路徑偵測，候選路徑函式保持純函式（以 `PathEnv` 注入平台資訊）。
   - `src/core/asar.ts`：asar 操作一律經過 `AsarArchiver` 介面，方便注入假實作測試。
@@ -57,6 +58,12 @@ node dist/cli.js validate
   - `background.json` 必須向下相容：沒有 `kind` 欄位的舊設定一律視為圖片
   - 介面面板：根元素與小按鈕必須帶 `data-antigravity-i18n-skip`；IndexedDB 任何失敗都只能降級為「只在目前視窗生效」並提示；從 IndexedDB 讀回的資料必須重新驗證後才能套用
   - 跨函式共用的字串（例如翻譯停用旗標 `antigravity-i18n:i18n-disabled`）因無法共用常數，需在測試中比對各份內容相同
+- `src/core/errors.ts`：`EBUSY` / `EPERM` / `EACCES` 一律轉成帶處理步驟的 `FileLockError`（`atomicWrite` / `atomicCopy` 已處理），CLI 以 `formatFsError` 輸出、控制台顯示步驟與重試按鈕。
+- `src/ui/`：本機圖形控制台（`antigravity-i18n` 不帶參數或 `antigravity-i18n ui`）。**只能使用 Node 內建模組**（`node:http`、`node:crypto`），不可新增執行期相依套件。
+  - `server.ts`：只監聽 `127.0.0.1`；**所有**請求檢查 `Host` 必須是 `127.0.0.1:<port>`（含首頁，防 DNS rebinding）；**所有** `/api/*` 必須帶正確的 `X-AGI18N-Token`（timingSafeEqual）；有 `Origin` 時必須同源；不回應任何 CORS header。放寬任何一項都不可接受。
+  - `actions.ts`：把 CLI 功能包成回傳結構化結果的函式（不印出），偵測函式可注入。
+  - `html.ts`：單一自足 HTML，腳本帶 CSP nonce；動態資料一律以 `textContent` 寫入，不可用 `innerHTML`。介面文字放在 `UI_TEXT`（zh-TW / zh-CN / en），同樣遵守繁簡用語規範。
+  - 測試 server 時一律注入只認自訂路徑的 `detect`，並把 `toolHome` / `userHome` 指向暫存目錄。
 - CLI 的使用者訊息使用繁體中文；程式碼識別字使用英文。
 
 ## 安全原則（不可違反）
@@ -116,11 +123,12 @@ node dist/cli.js validate
 src/cli.ts                 commander 入口
 src/types.ts               共用型別、語系／目標／模組常數
 src/config/paths.ts        各平台（含 WSL）安裝路徑偵測
-src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules
+src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules / errors
 src/runtime/overlay.ts     renderer 端 DOM 翻譯 runtime
 src/runtime/background.ts  背景圖：主行程讀取 + renderer 注入
 src/runtime/panel.ts       介面內背景設定面板（Ctrl+Alt+B）
-src/commands/              status / apply / restore / rules / bg / validate
+src/commands/              status / apply / restore / rules / bg / ui / validate
+src/ui/                    本機圖形控制台：server / actions / html（零相依套件）
 locales/                   zh-TW、zh-CN 各 7 個模組 + protected-terms.json
 tests/                     vitest 單元測試（runtime 測試使用 jsdom，面板持久化測試使用 fake-indexeddb）
 ```

@@ -2,6 +2,14 @@
   "name": "antigravity-i18n",
   "version": "0.1.0",
   "description": "跨平台 Google Antigravity 繁體中文（zh-TW）與簡體中文（zh-CN）中文化 CLI 工具",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Carinoasd/antigravity-i18n.git"
+  },
+  "homepage": "https://github.com/Carinoasd/antigravity-i18n#readme",
+  "bugs": {
+    "url": "https://github.com/Carinoasd/antigravity-i18n/issues"
+  },
   "type": "module",
   "bin": {
     "antigravity-i18n": "dist/cli.js"
@@ -11,6 +19,8 @@
     "dist",
     "locales",
     "README.md",
+    "README.en.md",
+    "README.zh-CN.md",
     "LICENSE"
   ],
   "scripts": {
@@ -19,7 +29,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate": "node dist/cli.js validate",
-    "prepublishOnly": "npm run typecheck && npm run build && npm test && node dist/cli.js validate"
+    "prepublishOnly": "npm run typecheck && npm run build && npm test && node dist/cli.js validate",
+    "prepare": "npm run build"
   },
   "engines": {
     "node": ">=20"
@@ -33,7 +44,12 @@
     "chinese",
     "localization",
     "electron",
-    "asar"
+    "asar",
+    "google-antigravity",
+    "wallpaper",
+    "background",
+    "theme",
+    "custom-theme"
   ],
   "license": "MIT",
   "dependencies": {

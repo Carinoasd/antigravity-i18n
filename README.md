@@ -1,6 +1,32 @@
+<p align="center"><b>繁體中文</b> | <a href="./README.zh-CN.md">简体中文</a> | <a href="./README.en.md">English</a></p>
+
 # antigravity-i18n
 
-跨平台（Linux / macOS / Windows）的 **Google Antigravity 中文化 CLI 工具**，支援 **繁體中文（`zh-TW`）** 與 **簡體中文（`zh-CN`）**。
+[![CI](https://github.com/Carinoasd/antigravity-i18n/actions/workflows/ci.yml/badge.svg)](https://github.com/Carinoasd/antigravity-i18n/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
+
+跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 中文化與外觀工具**：繁體中文（`zh-TW`）、簡體中文（`zh-CN`）、自訂背景，**不用背指令**，打開圖形控制台按一下就好。
+
+## 🚀 最快的方式：直接開啟圖形控制台
+
+需要 [Node.js 20 以上](https://nodejs.org/)。在終端機執行：
+
+```bash
+npx github:Carinoasd/antigravity-i18n
+```
+
+瀏覽器會自動打開本機控制台，可以：
+
+- 一鍵套用「繁體中文＋背景面板」或「簡體中文＋背景面板」
+- 只要自訂背景與 `Ctrl+Alt+B` 面板、維持英文介面
+- 一鍵無損還原官方原版
+- 套用 5 款內建漸層背景、調整不透明度／模糊／遮罩
+- 安裝或移除中文 AI 全域規則（零侵入模式）
+
+> 控制台只監聽 `127.0.0.1`，每次啟動都會產生新的存取 Token，其他電腦或網站都無法操作。按「關閉控制台」或 `Ctrl+C` 即可結束。
+>
+> ⚠️ npm 上名為 `antigravity-i18n` 的套件**不是本專案**（屬於另一位作者）。請使用上面的 `github:` 寫法，或依下方步驟從原始碼安裝。
 
 - 🖥️ 支援 Antigravity **App**（桌面版 2.0+，`app.asar`）、**IDE**（編輯器與 Agent 面板）、**CLI**（`agy`）
 - 🧩 App 採**雙層機制**：靜態翻譯主行程選單／系統匣／更新提示，加上**執行期 DOM 注入層**即時翻譯動態載入的 React UI
@@ -9,25 +35,24 @@
 - 🪶 **零侵入模式**：只安裝全域規則，讓 AI 全程以中文回覆，完全不修改安裝檔
 - 🖼️ **自訂背景圖**（App）：`bg set` 使用自己的圖片，或 `bg preset` 套用 5 款內建純 CSS 漸層；`--tint` 加上可讀性遮罩；換圖、換預設都不需重新套用
 - 🎛️ **介面內背景面板**（App）：按 **`Ctrl + Alt + B`**（macOS `Cmd + Option + B`）直接在 Antigravity 裡選圖、換預設、拖拉桿，0 秒生效、免重開
+- 🎨 **僅背景模式**：`--lang none` 維持英文介面，只加上背景與面板
 - ✅ 內建 CI 詞庫驗證器（key 一致性、佔位符、保護詞、繁簡用語檢查）
 
 > ⚠️ 本專案為社群專案，與 Google 無關。修改應用程式檔案有風險，請先用 `--dry-run` 預覽，並確認 `restore` 可正常運作。
 
-## 安裝
-
-需要 Node.js 20 以上。
+## 從原始碼安裝
 
 ```bash
 git clone https://github.com/Carinoasd/antigravity-i18n.git
 cd antigravity-i18n
-npm install
-npm run build
-npm link   # 之後即可直接使用 antigravity-i18n 指令
+npm install        # 會自動編譯
+npm link           # 之後即可直接使用 antigravity-i18n 指令
+antigravity-i18n   # 不帶參數：開啟圖形控制台
 ```
 
 不想 `npm link` 的話，也可以直接以 `node dist/cli.js <指令>` 執行。
 
-## 快速開始
+## 指令列快速開始
 
 ```bash
 # 1. 檢查本機安裝與中文化狀態
@@ -38,6 +63,9 @@ antigravity-i18n apply --lang zh-TW --dry-run
 
 # 3. 關閉 Antigravity 後正式套用
 antigravity-i18n apply --lang zh-TW
+
+# 只要背景與 Ctrl+Alt+B 面板，維持英文介面
+antigravity-i18n apply --lang none --target app
 
 # 4. 想還原時
 antigravity-i18n restore
@@ -50,6 +78,23 @@ antigravity-i18n rules install --lang zh-TW
 ```
 
 ## 指令說明
+
+### `ui`（圖形控制台）
+
+```bash
+antigravity-i18n          # 在終端機中不帶任何參數執行：直接開啟控制台
+antigravity-i18n ui       # 同上
+antigravity-i18n ui --port 7788 --no-open
+```
+
+| 選項 | 說明 |
+| --- | --- |
+| `--port <n>` | 監聽的埠號，預設 `0`（自動挑選可用埠） |
+| `--no-open` | 不自動開啟瀏覽器，只顯示網址 |
+
+- 只監聽 `127.0.0.1`，絕不綁 `0.0.0.0`。
+- 每次啟動產生隨機的 32-byte Token，所有 API 都必須帶正確的 `X-AGI18N-Token`，且 `Host` 必須是 `127.0.0.1:<port>`，否則一律回傳 `403`。
+- 在 CI 或非互動環境（例如 `CI=true`、輸出被導向檔案）中不帶參數執行時，維持顯示 `--help`，不會啟動 server。
 
 ### `status`（別名 `doctor`）
 
@@ -77,7 +122,7 @@ antigravity-i18n apply --lang <zh-TW|zh-CN> [--target <app|ide|cli|all>] [--path
 
 | 選項 | 說明 |
 | --- | --- |
-| `-l, --lang` | **必填**，`zh-TW` 或 `zh-CN`（也接受 `zh_tw`、`tw`、`zh-Hant` 等寫法） |
+| `-l, --lang` | **必填**，`zh-TW`、`zh-CN`（也接受 `zh_tw`、`tw`、`zh-Hant` 等寫法），或 `none`（僅背景模式，只適用 `app`） |
 | `-t, --target` | `app`、`ide`、`cli` 或 `all`（預設 `all`，偵測不到的目標會自動略過） |
 | `-p, --path` | 手動指定安裝路徑，需搭配單一 `--target` |
 | `--dry-run` | 只預覽命中字串數與預計覆蓋率，不修改任何檔案 |
@@ -92,6 +137,8 @@ antigravity-i18n apply --lang <zh-TW|zh-CN> [--target <app|ide|cli|all>] [--path
 4. IDE：同步更新 `product.json` 的 `checksums`，避免「安裝似乎已損毀」提示
 5. macOS App：同步更新 `Info.plist` 的 `ElectronAsarIntegrity`
 6. 寫入 Manifest 到 `~/.antigravity-i18n/manifests/` 並輸出摘要
+
+**僅背景模式（`--lang none`）**：不做任何翻譯、不載入翻譯 runtime，只在 App 主行程掛載背景與 `Ctrl+Alt+B` 介面面板，介面維持英文。`status` 會顯示「僅背景模式（none）」，`restore` 一樣逐位元組還原。搭配 `--target all` 時會自動略過 IDE 與 CLI。
 
 安全機制：
 
@@ -383,7 +430,14 @@ Electron / VS Code 的 bundle 裡，`"Off"`、`"Run"` 這類短字串常常同�
 
 ## 各平台注意事項
 
-- **請先完全關閉 Antigravity** 再執行 `apply` / `restore`。Windows 上檔案被占用時會出現 `EBUSY` / `EPERM`。
+- **請先完全關閉 Antigravity** 再執行 `apply` / `restore`（包含系統匣圖示：右鍵 → Quit）。遇到 `EBUSY` / `EPERM` / `EACCES` 時，CLI 與控制台都會顯示具體的處理步驟，例如：
+  ```
+  ✖ 檔案正被 Antigravity 使用中，無法寫入（EBUSY）：C:\Users\me\AppData\Local\Programs\Antigravity\resources\app.asar
+    處理方式：
+      1. 完全關閉 Antigravity：關閉所有視窗，並在系統匣的 Antigravity 圖示上按右鍵 → Quit（結束）
+      2. 若仍失敗：開啟工作管理員，結束所有名為 Antigravity 的處理程序
+      3. 回到這裡重試一次（套用與還原都會先備份，重試是安全的）
+  ```
 - **權限**：安裝在系統目錄（如 `/opt`、`/usr/share`、`C:\Program Files`）時需要 `sudo` 或系統管理員權限。使用 `sudo` 時，資料會寫到 root 的家目錄；可用 `sudo -E` 或設定 `ANTIGRAVITY_I18N_HOME` 指定資料目錄。
 - **macOS**：修改 App 內容會使程式碼簽章失效，套用後請執行：
   ```bash
@@ -450,7 +504,8 @@ src/
 │   ├── overlay.ts         # 注入 renderer 的 DOM 翻譯 runtime（零依賴、自足）
 │   ├── background.ts      # 背景圖：主行程讀取設定 + renderer 注入圖層（皆序列化進掛鉤）
 │   └── panel.ts           # 介面內背景設定面板（Ctrl+Alt+B、IndexedDB 持久化）
-└── commands/              # status / apply / restore / rules / bg / validate
+├── ui/                    # 本機圖形控制台（server.ts、html.ts、actions.ts，零相依套件）
+└── commands/              # status / apply / restore / rules / bg / ui / validate
 locales/                   # 詞庫（zh-TW、zh-CN 各 7 個模組）
 tests/                     # vitest 單元測試
 ```
