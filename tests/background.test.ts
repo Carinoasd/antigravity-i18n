@@ -157,7 +157,11 @@ describe('WSL 路徑轉換', () => {
     const wsl: WslContext = { distro: 'Ubuntu', windowsHome: winHome };
     const p = image();
     const r = setBackground(home, p, { wsl });
-    expect(r.config.windowsPath).toBe(wslToWindowsPath(p, 'Ubuntu'));
+    // POSIX 暫存路徑會轉成 UNC 路徑；在 Windows runner 上暫存目錄本身就是 C:\...，
+    // 不是 WSL 會出現的路徑，此時不應記錄 windowsPath
+    const expected = wslToWindowsPath(p, 'Ubuntu');
+    if (expected) expect(r.config.windowsPath).toBe(expected);
+    else expect(r.config.windowsPath).toBeUndefined();
     expect(r.mirror).toBe(path.join(winHome, '.antigravity-i18n', 'background.json'));
     expect(fs.readFileSync(r.mirror!, 'utf8')).toBe(fs.readFileSync(r.file, 'utf8'));
     // 圖片在 WSL 檔案系統時提醒改放 Windows 磁碟
