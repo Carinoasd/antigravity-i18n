@@ -1,6 +1,7 @@
 import path from 'node:path';
 import pc from 'picocolors';
 import { defaultLocalesDir, validateLocales } from '../core/locales.js';
+import { LANGS } from '../types.js';
 import { sym } from './common.js';
 
 export interface ValidateOptions {
@@ -15,7 +16,8 @@ export async function validateCommand(opts: ValidateOptions = {}): Promise<numbe
 
   console.log(pc.bold('\n詞庫驗證'));
   console.log(`${sym.dot} 詞庫目錄：${pc.dim(dir)}`);
-  console.log(`${sym.dot} 模組數：${report.moduleCount}　zh-TW：${report.keyCount['zh-TW']} 條　zh-CN：${report.keyCount['zh-CN']} 條\n`);
+  const counts = LANGS.map((l) => `${l}：${report.keyCount[l]} 條`).join('　');
+  console.log(`${sym.dot} 模組數：${report.moduleCount}　${counts}\n`);
 
   for (const i of errors) console.log(`${sym.fail} ${pc.red(i.file)}${i.key ? pc.dim(` 「${i.key}」`) : ''}：${i.message}`);
   for (const i of warnings) console.log(`${sym.warn} ${pc.yellow(i.file)}${i.key ? pc.dim(` 「${i.key}」`) : ''}：${i.message}`);

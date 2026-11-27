@@ -1,9 +1,9 @@
-/** 支援的語系 */
-export const LANGS = ['zh-TW', 'zh-CN'] as const;
+/** 支援的語系（繁體中文、簡體中文、日文、韓文） */
+export const LANGS = ['zh-TW', 'zh-CN', 'ja', 'ko'] as const;
 export type Lang = (typeof LANGS)[number];
 
 /**
- * apply 可用的語系：除了 zh-TW / zh-CN，`none` 表示「僅背景模式」：
+ * apply 可用的語系：除了 zh-TW / zh-CN / ja / ko，`none` 表示「僅背景模式」：
  * 只對 app 目標掛載主行程背景與 Ctrl+Alt+B 面板，不做任何翻譯。
  */
 export type ApplyLang = Lang | 'none';

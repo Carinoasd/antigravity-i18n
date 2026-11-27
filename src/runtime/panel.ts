@@ -107,7 +107,7 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       ['rgba(0,0,0,0.45)', '深暗 45%'],
       ['rgba(10,25,60,0.35)', '深藍 35%'],
     ];
-    const APPEARANCE = ['Appearance', '外觀', '外观'];
+    const APPEARANCE = ['Appearance', '外觀', '外观', '外観', '모양', '외관'];
     const presets = cfg.presets && typeof cfg.presets === 'object' ? cfg.presets : {};
     const maxBytes = typeof cfg.maxBytes === 'number' && cfg.maxBytes > 0 ? cfg.maxBytes : 10 * 1024 * 1024;
     const hasPreset = (n: unknown): n is string =>

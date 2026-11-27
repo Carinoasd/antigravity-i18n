@@ -16,11 +16,11 @@ export interface UiHtmlOptions {
 const escapeHtml = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-/** 介面文字（繁中 / 简中 / EN） */
-export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> = {
+/** 介面文字（繁中 / 简中 / 日本語 / 한국어 / EN） */
+export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'ja' | 'ko' | 'en', Record<string, string>> = {
   'zh-TW': {
-    title: 'Antigravity 中文化控制台',
-    subtitle: '不用背指令：在這裡套用中文化、自訂背景，或一鍵還原官方原版。',
+    title: 'Antigravity 多語系控制台',
+    subtitle: '不用背指令：在這裡套用繁／簡／日／韓在地化、自訂背景，或一鍵還原官方原版。',
     'status.title': '狀態總覽',
     'col.target': '目標',
     'col.path': '安裝路徑',
@@ -35,12 +35,14 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'actions.title': '一鍵操作',
     'actions.zhTW': '套用繁體中文＋背景面板',
     'actions.zhCN': '套用簡體中文＋背景面板',
+    'actions.ja': '套用日文（日本語）＋背景面板',
+    'actions.ko': '套用韓文（한국어）＋背景面板',
     'actions.none': '只要自訂背景與 Ctrl+Alt+B 面板（維持英文）',
     'actions.restore': '一鍵還原官方原版',
     'actions.dryRun': '只預覽（dry-run，不修改任何檔案）',
     'actions.note': '套用前會自動備份並校驗 SHA-256；請先完全關閉 Antigravity。套用後重新開啟 Antigravity 即生效。',
-    'rules.title': '零侵入模式：中文 AI 全域規則',
-    'rules.desc': '不修改任何安裝檔，只讓 AI 全程以中文回覆。',
+    'rules.title': '零侵入模式：多語系 AI 全域規則',
+    'rules.desc': '不修改任何安裝檔，只讓 AI 全程以指定語言回覆。',
     'rules.install': '安裝規則',
     'rules.remove': '移除規則',
     'bg.title': '背景快捷設定',
@@ -105,8 +107,8 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'preset.forest': '靜謐森林',
   },
   'zh-CN': {
-    title: 'Antigravity 汉化控制台',
-    subtitle: '不用记命令：在这里应用汉化、自定义背景，或一键还原官方原版。',
+    title: 'Antigravity 多语言控制台',
+    subtitle: '不用记命令：在这里应用繁／简／日／韩本地化、自定义背景，或一键还原官方原版。',
     'status.title': '状态总览',
     'col.target': '目标',
     'col.path': '安装路径',
@@ -121,12 +123,14 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'actions.title': '一键操作',
     'actions.zhTW': '应用繁体中文＋背景面板',
     'actions.zhCN': '应用简体中文＋背景面板',
+    'actions.ja': '应用日语＋背景面板',
+    'actions.ko': '应用韩语＋背景面板',
     'actions.none': '只要自定义背景与 Ctrl+Alt+B 面板（保持英文）',
     'actions.restore': '一键还原官方原版',
     'actions.dryRun': '只预览（dry-run，不修改任何文件）',
     'actions.note': '应用前会自动备份并校验 SHA-256；请先完全关闭 Antigravity。应用后重新打开 Antigravity 即生效。',
-    'rules.title': '零侵入模式：中文 AI 全局规则',
-    'rules.desc': '不修改任何安装文件，只让 AI 全程用中文回复。',
+    'rules.title': '零侵入模式：多语言 AI 全局规则',
+    'rules.desc': '不修改任何安装文件，只让 AI 全程用指定语言回复。',
     'rules.install': '安装规则',
     'rules.remove': '移除规则',
     'bg.title': '背景快捷设置',
@@ -190,9 +194,185 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'preset.midnight': '深夜蓝',
     'preset.forest': '静谧森林',
   },
+  ja: {
+    title: 'Antigravity 多言語コントロールパネル',
+    subtitle: 'コマンド不要：日本語・中国語・韓国語化、背景カスタマイズ、公式版への復元をワンクリックで行えます。',
+    'status.title': 'ステータス一覧',
+    'col.target': '対象',
+    'col.path': 'インストールパス',
+    'col.state': '状態',
+    'col.hook': 'フック',
+    'col.backup': 'バックアップ',
+    'paths.title': 'カスタムパス（自動検出されない場合に入力）',
+    'paths.app': 'App（app.asar を含むフォルダー）',
+    'paths.ide': 'IDE インストールフォルダー',
+    'paths.cli': 'CLI（agy）パス',
+    refresh: '更新',
+    'actions.title': 'ワンクリック操作',
+    'actions.zhTW': '繁体字中国語＋背景パネルを適用',
+    'actions.zhCN': '簡体字中国語＋背景パネルを適用',
+    'actions.ja': '日本語＋背景パネルを適用',
+    'actions.ko': '韓国語（한국어）＋背景パネルを適用',
+    'actions.none': '背景と Ctrl+Alt+B パネルのみ適用（英語のまま）',
+    'actions.restore': '公式版へワンクリック復元',
+    'actions.dryRun': 'プレビューのみ（dry-run・ファイル変更なし）',
+    'actions.note': '適用前に原本を自動バックアップし SHA-256 で検証します。Antigravity を完全終了してから適用し、再起動してください。',
+    'rules.title': '非侵入モード：AI グローバル言語ルール',
+    'rules.desc': 'アプリ本体を一切変更せず、AI の応答言語のみを指定言語に固定します。',
+    'rules.install': 'ルールをインストール',
+    'rules.remove': 'ルールを削除',
+    'bg.title': '背景クイック設定',
+    'bg.hint': '適用後は Antigravity 内で Ctrl+Alt+B（macOS：⌘+⌥+B）を押すだけで再起動なしに画像を変更できます。',
+    'bg.opacity': '不透明度',
+    'bg.blur': 'ぼかし',
+    'bg.tint': 'ティント',
+    'bg.mode': 'レイヤー',
+    'bg.tint.none': 'なし',
+    'bg.tint.dark25': 'ダーク 25%',
+    'bg.tint.dark45': 'ディープ 45%',
+    'bg.tint.navy35': 'ネイビー 35%',
+    'bg.mode.overlay': 'UI の前面に重ねる',
+    'bg.mode.underlay': 'UI の背面に配置',
+    'bg.image': 'またはローカル画像パスを直接入力：',
+    'bg.useImage': 'この画像を使用',
+    'bg.pick': '画像を選択…',
+    'bg.tooLarge': '画像サイズが 10 MB を超えています。小さい画像を選択してください',
+    'bg.badType': 'PNG、JPEG、WebP、GIF 画像のみ対応しています',
+    'hint.not-applied': 'App にはまだ適用されていないため、背景と Ctrl+Alt+B パネルは有効になっていません。下の「ワンクリック操作」から任意の適用ボタンを押してください。',
+    'hint.no-runtime': '現在の適用方式では背景フックが読み込まれていません。下の「ワンクリック操作」から再適用してください。',
+    'hint.old-hook': 'App の背景フックが旧バージョンです（v{current}、最新は v{latest}）。下の「ワンクリック操作」から再適用するとアップグレードされます。',
+    'bg.on': '有効化',
+    'bg.off': '無効化',
+    'bg.clear': '設定をクリア',
+    'bg.state.none': '背景：未設定',
+    'bg.state.on': '背景：有効',
+    'bg.state.off': '背景：無効',
+    'result.title': '実行結果',
+    'result.empty': 'まだ操作は実行されていません。',
+    'lock.title': 'Antigravity が実行中でファイルがロックされています',
+    'lock.retry': 'Antigravity を終了しました・再試行',
+    shutdown: 'パネルを閉じる',
+    'shutdown.done': 'コントロールパネルを終了しました。このタブを閉じて構いません。',
+    working: '実行中…',
+    'state.not-installed': '未検出',
+    'state.unsupported': '非対応',
+    'state.not-applied': '公式版（未適用）',
+    'state.applied': '適用済み',
+    'state.outdated': '一部失効（公式更新の可能性・再適用を推奨）',
+    'state.stale': '公式版に復元済み',
+    'state.bgOnly': '背景のみモード',
+    'backup.ok': '正常',
+    'backup.bad': '異常',
+    'r.applied': '適用完了',
+    'r.dry-run': 'プレビュー完了',
+    'r.already-applied': '適用済み（変更なし）',
+    'r.unsupported': '非対応',
+    'r.no-match': '一致する文字列がありません',
+    'r.not-installed': '未検出・スキップ',
+    'r.skipped': 'スキップ',
+    'r.error': '失敗',
+    'r.restored': '復元完了',
+    'r.already-original': 'すでに公式版です',
+    'r.blocked': '中止（ファイル未変更）',
+    'r.nothing': '復元可能な適用記録がありません',
+    'r.serverMsg': '詳細メッセージは繁体字中国語で表示されます',
+    'preset.aurora': 'オーロラ',
+    'preset.nebula': '星雲',
+    'preset.sunset': 'ネオン夕焼け',
+    'preset.midnight': 'ミッドナイト',
+    'preset.forest': '静寂の森',
+  },
+  ko: {
+    title: 'Antigravity 다국어 제어판',
+    subtitle: '명령어 없이 한국어·중국어·일본어 현지화, 배경 꾸미기, 공식 버전 복원을 한 번에 처리하세요.',
+    'status.title': '상태 요약',
+    'col.target': '대상',
+    'col.path': '설치 경로',
+    'col.state': '상태',
+    'col.hook': '훅',
+    'col.backup': '백업',
+    'paths.title': '사용자 지정 설치 경로 (자동 감지 실패 시 입력)',
+    'paths.app': 'App (app.asar가 있는 폴더)',
+    'paths.ide': 'IDE 설치 폴더',
+    'paths.cli': 'CLI (agy) 경로',
+    refresh: '새로 고침',
+    'actions.title': '원클릭 작업',
+    'actions.zhTW': '중국어 번체 + 배경 패널 적용',
+    'actions.zhCN': '중국어 간체 + 배경 패널 적용',
+    'actions.ja': '일본어 (日本語) + 배경 패널 적용',
+    'actions.ko': '한국어 + 배경 패널 적용',
+    'actions.none': '배경 및 Ctrl+Alt+B 패널만 적용 (영어 유지)',
+    'actions.restore': '공식 버전으로 원클릭 복원',
+    'actions.dryRun': '미리보기만 실행 (dry-run, 파일 변경 없음)',
+    'actions.note': '적용 전 원본을 자동 백업하고 SHA-256으로 검증합니다. Antigravity를 완전히 종료한 뒤 적용하고 다시 실행하세요.',
+    'rules.title': '무침투 모드: AI 전역 언어 규칙',
+    'rules.desc': '설치 파일을 수정하지 않고 AI 응답 언어만 지정한 언어로 설정합니다.',
+    'rules.install': '규칙 설치',
+    'rules.remove': '규칙 제거',
+    'bg.title': '배경 빠른 설정',
+    'bg.hint': '적용 후 Antigravity에서 Ctrl+Alt+B (macOS: ⌘+⌥+B)를 누르면 재시작 없이 이미지를 바로 바꿀 수 있습니다.',
+    'bg.opacity': '불투명도',
+    'bg.blur': '흐림',
+    'bg.tint': '틴트',
+    'bg.mode': '레이어',
+    'bg.tint.none': '없음',
+    'bg.tint.dark25': '어둡게 25%',
+    'bg.tint.dark45': '더 어둡게 45%',
+    'bg.tint.navy35': '네이비 35%',
+    'bg.mode.overlay': 'UI 위에 덮기',
+    'bg.mode.underlay': 'UI 아래에 배치',
+    'bg.image': '또는 컴퓨터의 이미지 경로 직접 입력:',
+    'bg.useImage': '이 이미지 사용',
+    'bg.pick': '이미지 선택…',
+    'bg.tooLarge': '이미지가 10 MB를 초과합니다. 더 작은 이미지를 선택하세요',
+    'bg.badType': 'PNG, JPEG, WebP, GIF 이미지만 지원합니다',
+    'hint.not-applied': 'App에 아직 적용되지 않아 배경과 Ctrl+Alt+B 패널이 활성화되지 않았습니다. 아래 "원클릭 작업"에서 원하는 적용 버튼을 눌러 주세요.',
+    'hint.no-runtime': '현재 적용 방식에 배경 훅이 포함되어 있지 않습니다. 아래 "원클릭 작업"에서 다시 적용해 주세요.',
+    'hint.old-hook': 'App의 배경 훅이 이전 버전입니다 (v{current}, 최신 v{latest}). 아래 "원클릭 작업"에서 다시 적용하면 업그레이드됩니다.',
+    'bg.on': '활성화',
+    'bg.off': '비활성화',
+    'bg.clear': '설정 지우기',
+    'bg.state.none': '배경: 설정 안 됨',
+    'bg.state.on': '배경: 활성화됨',
+    'bg.state.off': '배경: 비활성화됨',
+    'result.title': '실행 결과',
+    'result.empty': '아직 실행된 작업이 없습니다.',
+    'lock.title': 'Antigravity가 실행 중이어서 파일이 잠겨 있습니다',
+    'lock.retry': 'Antigravity 종료 완료 · 다시 시도',
+    shutdown: '제어판 닫기',
+    'shutdown.done': '제어판이 종료되었습니다. 이 탭을 닫아도 됩니다.',
+    working: '실행 중…',
+    'state.not-installed': '감지되지 않음',
+    'state.unsupported': '지원되지 않음',
+    'state.not-applied': '공식 버전 (미적용)',
+    'state.applied': '적용됨',
+    'state.outdated': '일부 만료 (공식 업데이트 가능성 · 재적용 권장)',
+    'state.stale': '공식 버전으로 복원됨',
+    'state.bgOnly': '배경 전용 모드',
+    'backup.ok': '정상',
+    'backup.bad': '오류',
+    'r.applied': '적용 완료',
+    'r.dry-run': '미리보기 완료',
+    'r.already-applied': '이미 적용됨 (변경 없음)',
+    'r.unsupported': '지원되지 않음',
+    'r.no-match': '일치하는 문자열 없음',
+    'r.not-installed': '감지되지 않음, 건너뜀',
+    'r.skipped': '건너뜀',
+    'r.error': '실패',
+    'r.restored': '복원 완료',
+    'r.already-original': '이미 공식 버전임',
+    'r.blocked': '중단됨 (파일 변경 없음)',
+    'r.nothing': '복원할 적용 기록이 없습니다',
+    'r.serverMsg': '상세 메시지는 중국어 번체로 표시됩니다',
+    'preset.aurora': '오로라',
+    'preset.nebula': '성운',
+    'preset.sunset': '네온 석양',
+    'preset.midnight': '미드나잇',
+    'preset.forest': '고요한 숲',
+  },
   en: {
     title: 'Antigravity i18n Control Panel',
-    subtitle: 'No commands to remember: apply Chinese localization, customize the background, or restore the official build in one click.',
+    subtitle: 'No commands to remember: apply zh-TW / zh-CN / Japanese / Korean localization, customize the background, or restore the official build in one click.',
     'status.title': 'Status',
     'col.target': 'Target',
     'col.path': 'Install path',
@@ -207,12 +387,14 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'actions.title': 'One-click actions',
     'actions.zhTW': 'Apply Traditional Chinese + background panel',
     'actions.zhCN': 'Apply Simplified Chinese + background panel',
+    'actions.ja': 'Apply Japanese (日本語) + background panel',
+    'actions.ko': 'Apply Korean (한국어) + background panel',
     'actions.none': 'Background & Ctrl+Alt+B panel only (keep English)',
     'actions.restore': 'Restore the official build',
     'actions.dryRun': 'Preview only (dry-run, no files are changed)',
     'actions.note': 'Originals are backed up and SHA-256 verified first. Quit Antigravity completely before applying, then reopen it.',
-    'rules.title': 'Zero-touch mode: Chinese AI global rule',
-    'rules.desc': 'Changes no installed files; only makes the AI reply in Chinese.',
+    'rules.title': 'Zero-touch mode: AI global language rule',
+    'rules.desc': 'Changes no installed files; only makes the AI reply in your chosen language.',
     'rules.install': 'Install rule',
     'rules.remove': 'Remove rule',
     'bg.title': 'Background',
@@ -337,6 +519,8 @@ const SCRIPT = `
   try {
     var saved = localStorage.getItem('agi18n-ui-lang');
     if (saved && TEXT[saved]) lang = saved;
+    else if (/^ja/i.test(navigator.language)) lang = 'ja';
+    else if (/^ko/i.test(navigator.language)) lang = 'ko';
     else if (/^zh-(CN|SG|Hans)/i.test(navigator.language)) lang = 'zh-CN';
     else if (!/^zh/i.test(navigator.language)) lang = 'en';
   } catch (e) {}
@@ -347,8 +531,8 @@ const SCRIPT = `
     var key = 'preset.' + name;
     return (TEXT[lang] && TEXT[lang][key]) || fallback || name;
   }
-  function sep() { return lang === 'en' ? ': ' : '：'; }
-  function paren(s) { return lang === 'en' ? ' (' + s + ')' : '（' + s + '）'; }
+  function sep() { return lang === 'en' || lang === 'ko' ? ': ' : '：'; }
+  function paren(s) { return lang === 'en' || lang === 'ko' ? ' (' + s + ')' : '（' + s + '）'; }
 
   function el(tag, text, cls) {
     var n = document.createElement(tag);
@@ -358,7 +542,7 @@ const SCRIPT = `
   }
 
   function applyLang() {
-    document.documentElement.lang = lang === 'en' ? 'en' : lang === 'zh-CN' ? 'zh-Hans' : 'zh-Hant';
+    document.documentElement.lang = lang === 'en' ? 'en' : lang === 'ja' ? 'ja' : lang === 'ko' ? 'ko' : lang === 'zh-CN' ? 'zh-Hans' : 'zh-Hant';
     document.title = t('title');
     document.querySelectorAll('[data-i18n]').forEach(function (n) { n.textContent = t(n.getAttribute('data-i18n')); });
     document.querySelectorAll('.langs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang)); });
@@ -533,6 +717,8 @@ const SCRIPT = `
   var ACTIONS = {
     'apply-zh-TW': function () { return api('POST', '/api/apply', applyBody('zh-TW')); },
     'apply-zh-CN': function () { return api('POST', '/api/apply', applyBody('zh-CN')); },
+    'apply-ja': function () { return api('POST', '/api/apply', applyBody('ja')); },
+    'apply-ko': function () { return api('POST', '/api/apply', applyBody('ko')); },
     'apply-none': function () { return api('POST', '/api/apply', applyBody('none')); },
     restore: function () { return api('POST', '/api/restore', { target: 'all', paths: paths() }); },
     'rules-install': function () { return api('POST', '/api/rules', { action: 'install', lang: $('rules-lang').value }); },
@@ -615,6 +801,8 @@ export function renderUiHtml(opts: UiHtmlOptions): string {
   <nav class="langs" aria-label="Language">
     <button type="button" data-lang="zh-TW">繁中</button>
     <button type="button" data-lang="zh-CN">简中</button>
+    <button type="button" data-lang="ja">日本語</button>
+    <button type="button" data-lang="ko">한국어</button>
     <button type="button" data-lang="en">EN</button>
   </nav>
 </header>
@@ -644,6 +832,8 @@ export function renderUiHtml(opts: UiHtmlOptions): string {
     <div class="stack">
       <button type="button" class="primary" data-act="apply-zh-TW" data-i18n="actions.zhTW"></button>
       <button type="button" class="primary" data-act="apply-zh-CN" data-i18n="actions.zhCN"></button>
+      <button type="button" class="primary" data-act="apply-ja" data-i18n="actions.ja"></button>
+      <button type="button" class="primary" data-act="apply-ko" data-i18n="actions.ko"></button>
       <button type="button" data-act="apply-none" data-i18n="actions.none"></button>
       <button type="button" class="danger" data-act="restore" data-i18n="actions.restore"></button>
     </div>
@@ -652,7 +842,7 @@ export function renderUiHtml(opts: UiHtmlOptions): string {
     <h2 style="margin-top:16px" data-i18n="rules.title"></h2>
     <p class="note" data-i18n="rules.desc"></p>
     <div class="row">
-      <select id="rules-lang"><option value="zh-TW">繁體中文</option><option value="zh-CN">简体中文</option></select>
+      <select id="rules-lang"><option value="zh-TW">繁體中文</option><option value="zh-CN">简体中文</option><option value="ja">日本語</option><option value="ko">한국어</option></select>
       <button type="button" data-act="rules-install" data-i18n="rules.install"></button>
       <button type="button" data-act="rules-remove" data-i18n="rules.remove"></button>
     </div>

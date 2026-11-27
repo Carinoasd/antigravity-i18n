@@ -38,11 +38,13 @@ export class LocaleError extends Error {
   }
 }
 
-/** 將 `zh-tw`、`zh_TW`、`tw` 等寫法正規化 */
+/** 將 `zh-tw`、`zh_TW`、`jp`、`ko-kr` 等常見寫法正規化 */
 export function normalizeLang(input: string): Lang | null {
   const v = input.trim().toLowerCase().replace('_', '-');
   if (['zh-tw', 'tw', 'zh-hant', 'zh-hant-tw', 'traditional'].includes(v)) return 'zh-TW';
   if (['zh-cn', 'cn', 'zh-hans', 'zh-hans-cn', 'simplified'].includes(v)) return 'zh-CN';
+  if (['ja', 'jp', 'ja-jp', 'japanese'].includes(v)) return 'ja';
+  if (['ko', 'kr', 'ko-kr', 'korean'].includes(v)) return 'ko';
   return null;
 }
 
@@ -152,6 +154,8 @@ export const TERMINOLOGY_RULES: Record<Lang, { pattern: RegExp; hint: string }[]
     { pattern: /预设/u, hint: '大陆用语为「默认」' },
     { pattern: /讯息/u, hint: '大陆用语为「消息」' },
   ],
+  ja: [],
+  ko: [],
 };
 
 export interface ValidationIssue {
@@ -171,7 +175,7 @@ export interface ValidationReport {
 /** CI 用詞庫驗證器 */
 export function validateLocales(dir = defaultLocalesDir()): ValidationReport {
   const issues: ValidationIssue[] = [];
-  const keyCount: Record<Lang, number> = { 'zh-TW': 0, 'zh-CN': 0 };
+  const keyCount = Object.fromEntries(LANGS.map((l) => [l, 0])) as Record<Lang, number>;
   const rel = (f: string): string => path.relative(dir, f).split(path.sep).join('/');
   const err = (file: string, message: string, key?: string): void => {
     issues.push({ level: 'error', file: rel(file), key, message });
@@ -220,16 +224,21 @@ export function validateLocales(dir = defaultLocalesDir()): ValidationReport {
     }
   }
 
-  // zh-TW 與 zh-CN 的 key 必須完全一致
+  // 所有語系與基準語系（zh-TW）的 key 必須完全一致
+  const baseLang: Lang = 'zh-TW';
   for (const mod of LOCALE_MODULES) {
-    const tw = loaded['zh-TW']?.[mod];
-    const cn = loaded['zh-CN']?.[mod];
-    if (!tw || !cn) continue;
-    for (const k of Object.keys(tw)) {
-      if (!(k in cn)) err(moduleFile(dir, 'zh-CN', mod), '缺少 key（zh-TW 有、zh-CN 沒有）', k);
-    }
-    for (const k of Object.keys(cn)) {
-      if (!(k in tw)) err(moduleFile(dir, 'zh-TW', mod), '缺少 key（zh-CN 有、zh-TW 沒有）', k);
+    const base = loaded[baseLang]?.[mod];
+    if (!base) continue;
+    for (const lang of LANGS) {
+      if (lang === baseLang) continue;
+      const other = loaded[lang]?.[mod];
+      if (!other) continue;
+      for (const k of Object.keys(base)) {
+        if (!(k in other)) err(moduleFile(dir, lang, mod), `缺少 key（${baseLang} 有、${lang} 沒有）`, k);
+      }
+      for (const k of Object.keys(other)) {
+        if (!(k in base)) err(moduleFile(dir, baseLang, mod), `缺少 key（${lang} 有、${baseLang} 沒有）`, k);
+      }
     }
   }
 

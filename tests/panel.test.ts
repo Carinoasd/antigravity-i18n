@@ -374,6 +374,8 @@ describe('「設定 → 外觀」頁面的小按鈕', () => {
     ['英文標題', '<h2>Appearance</h2>'],
     ['翻譯後（繁中）', '<h1>外觀</h1>'],
     ['翻譯後（簡中）', '<div role="heading">外观</div>'],
+    ['翻譯後（日文）', '<h1>外観</h1>'],
+    ['翻譯後（韓文）', '<h1>모양</h1>'],
     ['側邊欄選取狀態', '<nav><a aria-current="page">Appearance</a></nav>'],
   ])('%s：出現時顯示，離開即隱藏', async (_name, html) => {
     const b = await boot();
