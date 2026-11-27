@@ -1,5 +1,6 @@
 import pc from 'picocolors';
 import { listManifests, manifestPathFor } from '../core/backup.js';
+import { formatFsError } from '../core/errors.js';
 import { restoreManifest } from '../core/patcher.js';
 import { TARGET_LABELS } from '../types.js';
 import { getToolHome, parseTargets, resolveTargets, sym } from './common.js';
@@ -49,7 +50,7 @@ export async function restoreCommand(opts: RestoreOptions): Promise<number> {
       }
     } catch (e) {
       failures++;
-      console.log(`  ${sym.fail} ${pc.red((e as Error).message)}\n`);
+      console.log(`${formatFsError(e).split('\n').map((l, i) => (i === 0 ? `  ${sym.fail} ${pc.red(l)}` : `  ${l}`)).join('\n')}\n`);
     }
   }
   return failures > 0 ? 1 : 0;

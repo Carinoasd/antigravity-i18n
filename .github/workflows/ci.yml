@@ -37,6 +37,8 @@ jobs:
         run: |
           node dist/cli.js --help
           node dist/cli.js --version
+          node dist/cli.js
+          node dist/cli.js ui --help
           node dist/cli.js status
         env:
           ANTIGRAVITY_I18N_HOME: ${{ runner.temp }}/agi18n

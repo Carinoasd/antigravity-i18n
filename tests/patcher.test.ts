@@ -342,6 +342,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
       mainEntry: 'dist/main.js',
       runtimeFile: `dist/${RUNTIME_FILE_NAME}`,
       format: 'cjs',
+      translation: true,
     });
     expect(r.asarEntries).toEqual([
       { path: 'dist/menu.js', kind: 'static', hits: 2 },
@@ -379,7 +380,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
     expect(runtime).toContain('(zh-TW)');
 
     const m = readManifest(r.manifestPath)!;
-    expect(m.runtime).toEqual({ entries: 8, mainEntry: 'dist/main.js', runtimeFile: `dist/${RUNTIME_FILE_NAME}`, hookVersion: HOOK_VERSION });
+    expect(m.runtime).toEqual({ entries: 8, mainEntry: 'dist/main.js', runtimeFile: `dist/${RUNTIME_FILE_NAME}`, hookVersion: HOOK_VERSION, translation: true });
 
     const res = await restoreManifest(r.manifestPath, { toolHome: home });
     expect(res.status).toBe('restored');

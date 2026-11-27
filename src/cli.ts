@@ -14,6 +14,7 @@ import { CliError } from './commands/common.js';
 import { restoreCommand } from './commands/restore.js';
 import { rulesCommand } from './commands/rules.js';
 import { statusCommand } from './commands/status.js';
+import { shouldLaunchUi, uiCommand } from './commands/ui.js';
 import { validateCommand } from './commands/validate.js';
 import { LocaleError, readToolVersion } from './core/locales.js';
 
@@ -43,7 +44,7 @@ program
 program
   .command('apply')
   .description('套用中文化（自動備份原始檔並寫入 manifest）')
-  .addOption(langOption().makeOptionMandatory())
+  .addOption(new Option('-l, --lang <lang>', '語系：zh-TW | zh-CN | none（僅背景模式：只掛載背景與 Ctrl+Alt+B 面板，限 app）').makeOptionMandatory())
   .addOption(targetOption())
   .option('-p, --path <customPath>', '手動指定安裝路徑（需搭配單一 --target）')
   .option('--dry-run', '只預覽命中字串數與預計覆蓋率，不修改任何檔案')
@@ -57,6 +58,7 @@ program
   $ antigravity-i18n apply --lang zh-TW --target ide
   $ antigravity-i18n apply --lang zh-CN --target app --path "/Applications/Antigravity App.app" --force
   $ antigravity-i18n apply --lang zh-TW --target app --no-runtime
+  $ antigravity-i18n apply --lang none --target app          # 維持英文，只要背景與 Ctrl+Alt+B 面板
 
 app 目標採雙層機制：
   靜態層      翻譯 app.asar 內主行程的原生選單、系統匣、更新提示與載入畫面
@@ -133,6 +135,13 @@ bg.command('off').description('暫時停用背景圖（保留設定）').action(
 bg.command('clear').description('清除背景圖設定檔').action(async () => run(() => bgClearCommand()));
 
 program
+  .command('ui')
+  .description('開啟本機圖形控制台（只監聽 127.0.0.1）；不帶任何參數執行 antigravity-i18n 時也會自動開啟')
+  .option('--port <n>', '監聽的埠號；0 表示自動挑選可用埠', '0')
+  .option('--no-open', '不要自動開啟瀏覽器，只顯示網址')
+  .action(async (opts) => run(() => uiCommand(opts)));
+
+program
   .command('validate')
   .description('CI 用詞庫驗證：JSON 語法、空值、zh-TW/zh-CN key 一致、佔位符與保護詞')
   .option('-d, --dir <dir>', '詞庫目錄（預設為套件內建 locales/）')
@@ -152,4 +161,12 @@ async function run(fn: () => Promise<number>): Promise<void> {
   }
 }
 
-await program.parseAsync(process.argv);
+if (shouldLaunchUi(process.argv, process.env, Boolean(process.stdin.isTTY), Boolean(process.stdout.isTTY))) {
+  // 直接執行 antigravity-i18n（例如 npx）：在互動式終端機中開啟圖形控制台
+  await run(() => uiCommand({}));
+} else if (process.argv.length <= 2) {
+  // 非互動環境（CI、管線）：維持顯示說明
+  program.outputHelp();
+} else {
+  await program.parseAsync(process.argv);
+}

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { backupsDir, manifestsDir } from '../config/paths.js';
+import { toFriendlyError } from './errors.js';
 import type { DetectedTarget, Manifest, TargetId } from '../types.js';
 
 export function sha256(data: Buffer | string): string {
@@ -44,13 +45,8 @@ export function atomicWrite(file: string, data: Buffer | string): void {
     } catch {
       /* ignore */
     }
-    const code = (e as NodeJS.ErrnoException).code;
-    if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') {
-      throw new Error(
-        `無法寫入 ${file}（${code}）。請先完全關閉 Antigravity，或以系統管理員 / sudo 權限重新執行。`,
-      );
-    }
-    throw e;
+    // EBUSY / EPERM / EACCES 轉成帶處理步驟的 FileLockError
+    throw toFriendlyError(e, file);
   }
 }
 
@@ -73,11 +69,7 @@ export function atomicCopy(src: string, dest: string): void {
     } catch {
       /* ignore */
     }
-    const code = (e as NodeJS.ErrnoException).code;
-    if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') {
-      throw new Error(`無法寫入 ${dest}（${code}）。請先完全關閉 Antigravity，或以系統管理員 / sudo 權限重新執行。`);
-    }
-    throw e;
+    throw toFriendlyError(e, dest);
   }
 }
 

@@ -2,7 +2,7 @@ import os from 'node:os';
 import pc from 'picocolors';
 import { detectTarget, toolHome, type PathEnv } from '../config/paths.js';
 import { normalizeLang } from '../core/locales.js';
-import { TARGET_IDS, type DetectedTarget, type Lang, type TargetId, type TargetSelector } from '../types.js';
+import { TARGET_IDS, type ApplyLang, type DetectedTarget, type Lang, type TargetId, type TargetSelector } from '../types.js';
 
 export class CliError extends Error {
   constructor(message: string) {
@@ -19,6 +19,20 @@ export function parseLang(input: string | undefined, required = true): Lang | un
   const lang = normalizeLang(input);
   if (!lang) throw new CliError(`不支援的語系「${input}」，可用值：zh-TW、zh-CN`);
   return lang;
+}
+
+/** apply 用：除了 zh-TW / zh-CN，也接受 none（僅背景模式） */
+export function parseApplyLang(input: string | undefined): ApplyLang {
+  if (input !== undefined && input.trim().toLowerCase() === 'none') return 'none';
+  if (input === undefined) throw new CliError('請以 --lang 指定語系：zh-TW、zh-CN，或 none（僅背景模式）');
+  const lang = normalizeLang(input);
+  if (!lang) throw new CliError(`不支援的語系「${input}」，可用值：zh-TW、zh-CN、none（僅背景模式）`);
+  return lang;
+}
+
+/** manifest 語系的顯示名稱 */
+export function langLabel(lang: ApplyLang): string {
+  return lang === 'none' ? '僅背景模式（none）' : lang;
 }
 
 export function parseTargets(input: string | undefined): { selector: TargetSelector; ids: TargetId[] } {

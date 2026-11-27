@@ -2,6 +2,13 @@
 export const LANGS = ['zh-TW', 'zh-CN'] as const;
 export type Lang = (typeof LANGS)[number];
 
+/**
+ * apply 可用的語系：除了 zh-TW / zh-CN，`none` 表示「僅背景模式」：
+ * 只對 app 目標掛載主行程背景與 Ctrl+Alt+B 面板，不做任何翻譯。
+ */
+export type ApplyLang = Lang | 'none';
+export const BACKGROUND_ONLY: ApplyLang = 'none';
+
 /** 支援的中文化目標 */
 export const TARGET_IDS = ['app', 'ide', 'cli'] as const;
 export type TargetId = (typeof TARGET_IDS)[number];
@@ -78,7 +85,7 @@ export interface Manifest {
   tool: 'antigravity-i18n';
   toolVersion: string;
   target: TargetId;
-  lang: Lang;
+  lang: ApplyLang;
   kind: DetectedTarget['kind'];
   installRoot: string;
   appliedAt: string;
@@ -86,5 +93,13 @@ export interface Manifest {
   files: ManifestFile[];
   stats: Omit<TranslateStats, 'hitsByKey'>;
   /** asar 目標的執行期注入層（未啟用時不存在） */
-  runtime?: { entries: number; mainEntry: string; runtimeFile: string; hookVersion?: number };
+  runtime?: {
+    entries: number;
+    mainEntry: string;
+    /** 僅背景模式（lang 為 none）不寫入翻譯 runtime，此欄位不存在 */
+    runtimeFile?: string;
+    hookVersion?: number;
+    /** 是否載入翻譯 runtime；舊版 manifest 沒有此欄位，視為 true */
+    translation?: boolean;
+  };
 }

@@ -1,0 +1,201 @@
+import crypto from 'node:crypto';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { RequestError, collectStatus, runApply, runBg, runRestore, runRules, toFriendly, type ActionContext } from './actions.js';
+import { renderUiHtml } from './html.js';
+import { HOOK_VERSION } from '../core/runtime.js';
+
+/**
+ * 零依賴的本機圖形控制台（只用 node:http / node:crypto）。
+ *
+ * 安全設計：
+ * - 只監聽 127.0.0.1，絕不綁 0.0.0.0
+ * - **所有**請求都檢查 `Host` 必須是 `127.0.0.1:<port>`（含首頁，防止 DNS rebinding 讀到 Token）
+ * - 有 `Origin` 時必須是 `http://127.0.0.1:<port>`
+ * - 每次啟動產生隨機 32-byte hex Token，內嵌在首頁；**所有** `/api/*` 都必須帶正確的
+ *   `X-AGI18N-Token` header（以 timingSafeEqual 比對），否則一律 403
+ * - 自訂 header 會觸發 CORS 預檢，而 server 不回應任何 CORS header，跨站請求無法帶上 Token
+ * - 首頁以帶 nonce 的 CSP 限制腳本來源，並禁止被嵌入 iframe
+ */
+
+export const UI_HOST = '127.0.0.1';
+export const TOKEN_HEADER = 'x-agi18n-token';
+const MAX_BODY = 1024 * 1024;
+
+export interface UiServerOptions extends ActionContext {
+  /** 0 表示由系統挑選可用埠 */
+  port?: number;
+  /** 測試用：指定 Token */
+  token?: string;
+}
+
+export interface UiServer {
+  host: typeof UI_HOST;
+  port: number;
+  url: string;
+  token: string;
+  server: http.Server;
+  /** server 關閉後 resolve（含透過 POST /api/shutdown 關閉） */
+  closed: Promise<void>;
+  close(): Promise<void>;
+}
+
+function send(res: http.ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
+  const isText = typeof body === 'string';
+  const data = isText ? body : JSON.stringify(body);
+  res.writeHead(status, {
+    'Content-Type': isText ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8',
+    'Content-Length': Buffer.byteLength(data),
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    ...headers,
+  });
+  res.end(data);
+}
+
+function tokenMatches(given: string | string[] | undefined, token: string): boolean {
+  if (typeof given !== 'string') return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > MAX_BODY) {
+        reject(new RequestError('請求內容過大', 413));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8').trim();
+      if (!raw) return resolve({});
+      try {
+        const v = JSON.parse(raw) as unknown;
+        if (!v || typeof v !== 'object' || Array.isArray(v)) return reject(new RequestError('請求內容必須是 JSON 物件'));
+        resolve(v as Record<string, unknown>);
+      } catch {
+        reject(new RequestError('請求內容不是合法的 JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
+  const token = opts.token ?? crypto.randomBytes(32).toString('hex');
+  const ctx: ActionContext = {
+    toolHome: opts.toolHome,
+    userHome: opts.userHome,
+    toolVersion: opts.toolVersion,
+    detect: opts.detect,
+    wsl: opts.wsl,
+    archiver: opts.archiver,
+  };
+  let port = 0;
+  let busy = false;
+  let resolveClosed: () => void = () => undefined;
+  const closed = new Promise<void>((r) => (resolveClosed = r));
+
+  /** apply / restore 會修改檔案：同一時間只允許一個 */
+  const exclusive = async <T>(fn: () => Promise<T>): Promise<T> => {
+    if (busy) throw new RequestError('另一個操作正在執行，請稍候', 409);
+    busy = true;
+    try {
+      return await fn();
+    } finally {
+      busy = false;
+    }
+  };
+
+  const server = http.createServer(async (req, res) => {
+    try {
+      const expectedHost = `${UI_HOST}:${port}`;
+      if (req.headers.host !== expectedHost) return send(res, 403, { ok: false, error: 'Host 不符' });
+      const origin = req.headers.origin;
+      if (origin !== undefined && origin !== `http://${expectedHost}`) return send(res, 403, { ok: false, error: 'Origin 不符' });
+
+      const url = new URL(req.url ?? '/', `http://${expectedHost}`);
+      const method = req.method ?? 'GET';
+
+      if (url.pathname === '/' && method === 'GET') {
+        const nonce = crypto.randomBytes(16).toString('base64');
+        return send(res, 200, renderUiHtml({ token, nonce, version: ctx.toolVersion, hookVersion: HOOK_VERSION }), {
+          'Content-Security-Policy': [
+            "default-src 'none'",
+            `script-src 'nonce-${nonce}'`,
+            "style-src 'unsafe-inline'",
+            "img-src 'self' data:",
+            "connect-src 'self'",
+            "base-uri 'none'",
+            "form-action 'none'",
+            "frame-ancestors 'none'",
+          ].join('; '),
+        });
+      }
+
+      if (!url.pathname.startsWith('/api/')) return send(res, 404, { ok: false, error: '找不到' });
+      if (!tokenMatches(req.headers[TOKEN_HEADER], token)) return send(res, 403, { ok: false, error: 'Token 不符' });
+
+      const route = `${method} ${url.pathname}`;
+      switch (route) {
+        case 'GET /api/status': {
+          const paths = { app: url.searchParams.get('app') ?? undefined, ide: url.searchParams.get('ide') ?? undefined, cli: url.searchParams.get('cli') ?? undefined };
+          return send(res, 200, { ok: true, ...(await collectStatus(ctx, paths)) });
+        }
+        case 'POST /api/apply': {
+          const body = await readJson(req);
+          return send(res, 200, await exclusive(() => runApply(ctx, body)));
+        }
+        case 'POST /api/restore': {
+          const body = await readJson(req);
+          return send(res, 200, await exclusive(() => runRestore(ctx, body)));
+        }
+        case 'POST /api/bg':
+          return send(res, 200, runBg(ctx, await readJson(req)));
+        case 'POST /api/rules':
+          return send(res, 200, runRules(ctx, await readJson(req)));
+        case 'POST /api/shutdown':
+          send(res, 200, { ok: true, message: '控制台已關閉' });
+          setImmediate(() => void close());
+          return;
+        default:
+          return send(res, 404, { ok: false, error: '找不到' });
+      }
+    } catch (e) {
+      if (e instanceof RequestError) return send(res, e.status, { ok: false, error: e.message });
+      return send(res, 500, { ok: false, error: toFriendly(e).message, detail: toFriendly(e) });
+    }
+  });
+
+  let closing: Promise<void> | null = null;
+  const close = (): Promise<void> => {
+    closing ??= new Promise<void>((resolve) => {
+      server.close(() => {
+        resolveClosed();
+        resolve();
+      });
+      server.closeAllConnections();
+    });
+    return closing;
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(opts.port ?? 0, UI_HOST, () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  port = (server.address() as AddressInfo).port;
+
+  return { host: UI_HOST, port, url: `http://${UI_HOST}:${port}/`, token, server, closed, close };
+}
