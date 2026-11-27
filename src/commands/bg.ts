@@ -56,7 +56,12 @@ export function hookHint(home: string): string | null {
   }
   if (!manifests.some((m) => (m.runtime?.hookVersion ?? 1) >= HOOK_VERSION)) {
     const v = Math.max(...manifests.map((m) => m.runtime?.hookVersion ?? 1));
-    const missing = v < 2 ? '不支援背景圖' : '不支援內建預設（bg preset）與遮罩（--tint）';
+    const missing =
+      v < 2
+        ? '不支援背景圖'
+        : v < 3
+          ? '不支援內建預設（bg preset）、遮罩（--tint）與介面內背景面板（Ctrl+Alt+B）'
+          : '沒有介面內背景面板（Ctrl+Alt+B）';
     return `App 的主行程掛鉤為舊版（v${v}，目前為 v${HOOK_VERSION}），${missing}。請重新套用一次：antigravity-i18n apply --lang <語系> --target app --force`;
   }
   return null;

@@ -44,6 +44,8 @@ node dist/cli.js validate
     預設只能用漸層與顏色值（字元限制 `[A-Za-z0-9#%.,()\s-]`，不可有 `url()`）。新增或修改預設後，使用者需重新 `apply --force` 才會更新掛鉤內的表。
   - `src/runtime/overlay.ts`：注入 renderer 的 DOM 翻譯 runtime。
   - `src/runtime/background.ts`：背景圖的主行程讀取函式與 renderer 注入函式。
+  - `src/runtime/panel.ts`：介面內背景設定面板（`Ctrl + Alt + B` / macOS `Cmd + Option + B`）。
+    掛鉤組合腳本時把 `applyBackground` 以參數傳入（不可直接引用）；設定存於 IndexedDB `antigravity-i18n`。
 - **`src/runtime/` 的特殊規則**：這裡的函式會被 `toString()` 序列化，內嵌進主行程掛鉤或注入頁面，因此
   - 必須完全自足：不可引用模組層級變數、import 或其他函式
   - 零依賴，只用瀏覽器內建 API
@@ -53,6 +55,8 @@ node dist/cli.js validate
   - 背景圖層必須維持 `pointer-events: none` 與 `data-antigravity-i18n-skip`
   - 同一條驗證規則（例如 tint 的 `TINT_RE`）在 `src/core/` 與 `src/runtime/` 各有一份時，必須完全一致，並以測試逐一比對同一批輸入
   - `background.json` 必須向下相容：沒有 `kind` 欄位的舊設定一律視為圖片
+  - 介面面板：根元素與小按鈕必須帶 `data-antigravity-i18n-skip`；IndexedDB 任何失敗都只能降級為「只在目前視窗生效」並提示；從 IndexedDB 讀回的資料必須重新驗證後才能套用
+  - 跨函式共用的字串（例如翻譯停用旗標 `antigravity-i18n:i18n-disabled`）因無法共用常數，需在測試中比對各份內容相同
 - CLI 的使用者訊息使用繁體中文；程式碼識別字使用英文。
 
 ## 安全原則（不可違反）
@@ -115,7 +119,8 @@ src/config/paths.ts        各平台（含 WSL）安裝路徑偵測
 src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules
 src/runtime/overlay.ts     renderer 端 DOM 翻譯 runtime
 src/runtime/background.ts  背景圖：主行程讀取 + renderer 注入
+src/runtime/panel.ts       介面內背景設定面板（Ctrl+Alt+B）
 src/commands/              status / apply / restore / rules / bg / validate
 locales/                   zh-TW、zh-CN 各 7 個模組 + protected-terms.json
-tests/                     vitest 單元測試（runtime 測試使用 jsdom）
+tests/                     vitest 單元測試（runtime 測試使用 jsdom，面板持久化測試使用 fake-indexeddb）
 ```

@@ -66,6 +66,13 @@ export const BACKGROUND_PRESETS: Record<string, BackgroundPreset> = {
   },
 };
 
+/** 介面面板用：名稱 → 中文名稱與 CSS 值 */
+export function presetMeta(): Record<string, { label: string; image: string }> {
+  const out: Record<string, { label: string; image: string }> = {};
+  for (const [name, p] of Object.entries(BACKGROUND_PRESETS)) out[name] = { label: p.label, image: p.image };
+  return out;
+}
+
 /** 掛鉤內嵌用：只保留 CSS 值 */
 export function presetImages(): Record<string, string> {
   const out: Record<string, string> = {};
