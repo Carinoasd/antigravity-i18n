@@ -496,10 +496,42 @@ describe('本機 HTTP server', () => {
     expect(fs.existsSync(path.join(home, 'wallpaper.png'))).toBe(false);
   });
 
+  it('POST /api/bg/upload：分段慢速上傳超過上限時，client 仍能完整送出並讀到 413', async () => {
+    const status = await new Promise<number | string>((resolve) => {
+      const total = 10 * 1024 * 1024 + 64 * 1024;
+      const req = http.request(
+        {
+          host: UI_HOST,
+          port: srv.port,
+          method: 'POST',
+          path: '/api/bg/upload',
+          agent: false,
+          headers: { Host: `${UI_HOST}:${srv.port}`, 'X-AGI18N-Token': srv.token, 'Content-Type': 'image/png', 'Content-Length': String(total) },
+        },
+        (res) => {
+          res.resume();
+          res.on('end', () => resolve(res.statusCode ?? 0));
+        },
+      );
+      req.on('error', (e) => resolve(e.message));
+      const chunk = Buffer.alloc(1024 * 1024);
+      let sent = 0;
+      const pump = (): void => {
+        if (sent >= total) return void req.end();
+        const n = Math.min(chunk.length, total - sent);
+        sent += n;
+        req.write(chunk.subarray(0, n), () => setTimeout(pump, 5));
+      };
+      pump();
+    });
+    expect(status).toBe(413);
+  });
+
   it('POST /api/bg/upload：超過 10 MB 回傳 413；缺少或錯誤 Token 回傳 403', async () => {
     const big = Buffer.concat([PNG, Buffer.alloc(10 * 1024 * 1024)]);
     const r = await upload(big);
-    expect(r.status).toBe(413);
+    // status -1 表示 client 端出錯（r.text 為錯誤訊息），一併顯示方便診斷
+    expect([r.status, r.status === -1 ? r.text : '']).toEqual([413, '']);
     expect(r.json.error).toContain('10 MB');
     expect(fs.existsSync(path.join(home, 'wallpaper.png'))).toBe(false);
     expect((await upload(PNG, { token: null })).status).toBe(403);

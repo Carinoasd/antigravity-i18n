@@ -205,15 +205,18 @@ export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
       }
     } catch (e) {
       if (e instanceof TooLargeError) {
-        // 先回應 413，再丟棄剩餘的上傳內容，讓 client 能寫完並讀到回應
-        // （若立刻關閉連線，client 可能在上傳途中收到 EPIPE / ECONNRESET 而讀不到 413）。
+        // 先把剩餘的上傳內容讀完丟棄，收到 end 後才回應 413。
+        // 若在 client 仍在上傳時就回應並關閉連線，Windows / macOS 會送出 RST，
+        // client 在上傳途中收到 ECONNRESET / EPIPE 而讀不到 413。
         // 超過硬上限才強制中斷，避免無限上傳拖住連線。
-        send(res, 413, { ok: false, error: e.message }, { Connection: 'close' });
+        const respond = (): void => send(res, 413, { ok: false, error: e.message }, { Connection: 'close' });
+        if (req.readableEnded) return respond();
         let discarded = 0;
         req.on('data', (c: Buffer) => {
           discarded += c.length;
           if (discarded > MAX_IMAGE_BYTES * 2 + MAX_BODY) req.destroy();
         });
+        req.once('end', respond);
         req.resume();
         return;
       }
