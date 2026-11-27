@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as asar from '@electron/asar';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { appInstallCandidates, cliCandidates, detectTarget, ideInstallCandidates, type PathEnv } from '../src/config/paths.js';
+import { appInstallCandidates, cliCandidates, detectTarget, ideInstallCandidates, isWsl, type PathEnv } from '../src/config/paths.js';
 import { electronAsarArchiver, type AsarArchiver, type AsarEntry, type AsarWriteEntry } from '../src/core/asar.js';
 import { readManifest, sha256 } from '../src/core/backup.js';
 import { applyTarget, inspectTarget, restoreManifest, vscodeChecksum } from '../src/core/patcher.js';
@@ -50,6 +50,19 @@ describe('路徑偵測', () => {
     expect(ideInstallCandidates(pe('linux'))).toContain('/usr/share/antigravity');
     expect(cliCandidates(pe('linux', { PATH: '/usr/bin:/bin' }))).toContain('/usr/bin/agy');
     expect(cliCandidates({ platform: 'win32', home: 'C:\\Users\\u', env: { PATH: 'C:\\bin' } })).toContain('C:\\bin\\agy.cmd');
+  });
+
+  it('WSL：額外偵測 Windows 側（/mnt/c）的安裝', () => {
+    const wsl: PathEnv = { platform: 'linux', home: '/home/u', env: {}, wslWindowsUsers: ['Alice'] };
+    const app = appInstallCandidates(wsl);
+    expect(app).toContain('/opt/Antigravity');
+    expect(app).toContain('/mnt/c/Users/Alice/AppData/Local/Programs/Antigravity');
+    expect(app).toContain('/mnt/c/Program Files/Antigravity App');
+    expect(ideInstallCandidates(wsl)).toContain('/mnt/c/Users/Alice/AppData/Local/Programs/Antigravity');
+    // 非 WSL 的 Linux 不應出現 /mnt/c
+    expect(appInstallCandidates(pe('linux')).some((c) => c.startsWith('/mnt/c'))).toBe(false);
+    expect(isWsl({ WSL_DISTRO_NAME: 'Ubuntu' }, 'linux')).toBe(true);
+    expect(isWsl({ WSL_DISTRO_NAME: 'Ubuntu' }, 'darwin')).toBe(false);
   });
 
   it('偵測 IDE 結構並只納入 Antigravity 相關擴充功能', () => {
@@ -210,7 +223,9 @@ describe('App（app.asar）套用與還原', () => {
 
     const dry = await applyTarget(target, { lang: 'zh-TW', dict: dictTW, toolHome: home, dryRun: true });
     expect(dry.stats.matchedKeys).toBe(2);
+    expect(dry.files).toEqual([{ path: asarPath, role: 'content', hits: 2 }]);
     expect(fs.readFileSync(asarPath)).toEqual(original);
+    expect(fs.existsSync(home)).toBe(false);
 
     const r = await applyTarget(target, { lang: 'zh-TW', dict: dictTW, toolHome: home });
     expect(r.status).toBe('applied');
@@ -231,6 +246,10 @@ describe('App（app.asar）套用與還原', () => {
   it('macOS：同步更新 Info.plist 的 ElectronAsarIntegrity', async () => {
     const { asarPath, target } = await makeApp(true);
     expect(target.infoPlist).toBeDefined();
+    const plistBefore = fs.readFileSync(target.infoPlist!, 'utf8');
+    const dry = await applyTarget(target, { lang: 'zh-TW', dict: dictTW, toolHome: home, dryRun: true });
+    expect(dry.files.map((f) => f.role)).toEqual(['content', 'integrity']);
+    expect(fs.readFileSync(target.infoPlist!, 'utf8')).toBe(plistBefore);
     const r = await applyTarget(target, { lang: 'zh-TW', dict: dictTW, toolHome: home });
     expect(r.files.map((f) => f.role)).toEqual(['content', 'integrity']);
     const plist = fs.readFileSync(target.infoPlist!, 'utf8');

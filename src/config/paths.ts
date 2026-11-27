@@ -8,10 +8,58 @@ export interface PathEnv {
   platform: NodeJS.Platform;
   home: string;
   env: NodeJS.ProcessEnv;
+  /**
+   * 在 WSL 中執行時，Windows 側（/mnt/c/Users/*）的使用者目錄名稱；
+   * 非 WSL 環境為 undefined。用來額外偵測裝在 Windows 側的 Antigravity。
+   */
+  wslWindowsUsers?: string[];
+}
+
+/** WSL 的 Windows 系統磁碟掛載點 */
+export const WSL_WINDOWS_DRIVE = '/mnt/c';
+
+const WSL_SKIP_USERS = new Set(['all users', 'default', 'default user', 'public', 'defaultapppool', 'wdagutilityaccount']);
+
+/** 判斷目前是否在 WSL 中執行 */
+export function isWsl(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): boolean {
+  if (platform !== 'linux') return false;
+  if (env.WSL_DISTRO_NAME || env.WSL_INTEROP) return true;
+  try {
+    return /microsoft|wsl/i.test(fs.readFileSync('/proc/version', 'utf8'));
+  } catch {
+    return false;
+  }
+}
+
+/** 列出 /mnt/c/Users 下的 Windows 使用者目錄 */
+export function listWslWindowsUsers(drive = WSL_WINDOWS_DRIVE): string[] {
+  try {
+    return fs
+      .readdirSync(path.posix.join(drive, 'Users'), { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !WSL_SKIP_USERS.has(e.name.toLowerCase()))
+      .map((e) => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
 }
 
 export function defaultPathEnv(): PathEnv {
-  return { platform: process.platform, home: os.homedir(), env: process.env };
+  const pe: PathEnv = { platform: process.platform, home: os.homedir(), env: process.env };
+  if (isWsl(pe.env, pe.platform)) pe.wslWindowsUsers = listWslWindowsUsers();
+  return pe;
+}
+
+/** WSL 下對應 Windows 安裝位置的 /mnt/c 路徑 */
+function wslWindowsCandidates(pe: PathEnv, names: string[]): string[] {
+  if (pe.platform !== 'linux' || !pe.wslWindowsUsers) return [];
+  const p = path.posix;
+  const out: string[] = [];
+  for (const name of names) {
+    for (const user of pe.wslWindowsUsers) out.push(p.join(WSL_WINDOWS_DRIVE, 'Users', user, 'AppData', 'Local', 'Programs', name));
+    out.push(p.join(WSL_WINDOWS_DRIVE, 'Program Files', name), p.join(WSL_WINDOWS_DRIVE, 'Program Files (x86)', name));
+  }
+  return out;
 }
 
 function pathLib(platform: NodeJS.Platform): path.PlatformPath {
@@ -70,6 +118,7 @@ export function appInstallCandidates(pe: PathEnv): string[] {
         '/usr/lib/antigravity',
         p.join(pe.home, '.local', 'share', 'antigravity-app'),
         p.join(pe.home, '.local', 'share', 'antigravity'),
+        ...wslWindowsCandidates(pe, APP_DIR_NAMES),
       );
   }
   return out;
@@ -93,6 +142,7 @@ export function ideInstallCandidates(pe: PathEnv): string[] {
         '/opt/antigravity',
         '/usr/lib/antigravity',
         p.join(pe.home, '.local', 'share', 'antigravity'),
+        ...wslWindowsCandidates(pe, ['Antigravity']),
       ];
   }
 }

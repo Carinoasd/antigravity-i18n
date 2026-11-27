@@ -177,17 +177,21 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
           asarHits += r.totalHits;
         }
       }
-      if (translated.size > 0 && !ctx.dryRun) {
-        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'antigravity-i18n-'));
-        const tmpAsar = path.join(tmpDir, 'app.asar');
-        const writeEntries: AsarWriteEntry[] = entries.map((e) => {
-          if (e.type !== 'file') return e;
-          const data = translated.get(e.path);
-          if (data) return { ...e, read: () => data };
-          if (e.unpacked) return { ...e, read: () => fs.readFileSync(path.join(unpackedDir, ...e.path.split('/'))) };
-          return { ...e, read: () => archiver.readFile(src.from, e.path) };
-        });
-        await archiver.write(tmpAsar, writeEntries);
+      if (translated.size > 0) {
+        // dry-run 只列出預計修改的檔案，不建立暫存 asar
+        let tmpAsar: string | undefined;
+        if (!ctx.dryRun) {
+          tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'antigravity-i18n-'));
+          tmpAsar = path.join(tmpDir, 'app.asar');
+          const writeEntries: AsarWriteEntry[] = entries.map((e) => {
+            if (e.type !== 'file') return e;
+            const data = translated.get(e.path);
+            if (data) return { ...e, read: () => data };
+            if (e.unpacked) return { ...e, read: () => fs.readFileSync(path.join(unpackedDir, ...e.path.split('/'))) };
+            return { ...e, read: () => archiver.readFile(src.from, e.path) };
+          });
+          await archiver.write(tmpAsar, writeEntries);
+        }
         planned.push({ path: asarPath, role: 'content', source: src, hits: asarHits, fromFile: tmpAsar });
 
         if (t.infoPlist && sources.has(t.infoPlist)) {
@@ -199,8 +203,12 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
             const text = plist.toString('utf8');
             const re = /(<key>Resources\/app\.asar<\/key>\s*<dict>[\s\S]*?<key>hash<\/key>\s*<string>)([0-9a-fA-F]+)(<\/string>)/;
             if (re.test(text)) {
-              const next = text.replace(re, `$1${archiver.headerHash(tmpAsar)}$3`);
-              if (next !== text) planned.push({ path: t.infoPlist, role: 'integrity', source: plistSrc, hits: 0, data: Buffer.from(next, 'utf8') });
+              if (!tmpAsar) {
+                planned.push({ path: t.infoPlist, role: 'integrity', source: plistSrc, hits: 0 });
+              } else {
+                const next = text.replace(re, `$1${archiver.headerHash(tmpAsar)}$3`);
+                if (next !== text) planned.push({ path: t.infoPlist, role: 'integrity', source: plistSrc, hits: 0, data: Buffer.from(next, 'utf8') });
+              }
             }
           }
         }

@@ -210,6 +210,7 @@ Electron / VS Code 的 bundle 裡，`"Off"`、`"Run"` 這類短字串常常同�
   codesign --force --deep --sign - "/Applications/Antigravity.app"
   ```
 - **官方更新**：Antigravity 更新後會覆蓋中文化內容。`status` 會顯示「部分失效」，重新執行 `apply` 即可。
+- **WSL**：在 WSL 中執行時，除了 Linux 路徑，也會自動偵測裝在 Windows 側的 Antigravity（`/mnt/c/Users/<使用者>/AppData/Local/Programs/…`、`/mnt/c/Program Files/…`）。若裝在其他磁碟，請用 `--path "/mnt/d/…"` 指定。修補 Windows 側檔案前同樣要先在 Windows 完全關閉 Antigravity；也可以直接在 Windows 終端機執行本工具。
 
 ## 資料目錄
 
