@@ -18,6 +18,7 @@ import {
   writeManifest,
 } from './backup.js';
 import {
+  HOOK_VERSION,
   RUNTIME_FILE_NAME,
   buildRuntimeScript,
   countRuntimeEntries,
@@ -381,7 +382,7 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
       files: records,
       stats: { totalKeys: stats.totalKeys, matchedKeys: stats.matchedKeys, totalHits: stats.totalHits, coverage: stats.coverage },
       runtime: base.runtime?.enabled
-        ? { entries: base.runtime.entries, mainEntry: base.runtime.mainEntry!, runtimeFile: base.runtime.runtimeFile! }
+        ? { entries: base.runtime.entries, mainEntry: base.runtime.mainEntry!, runtimeFile: base.runtime.runtimeFile!, hookVersion: HOOK_VERSION }
         : undefined,
     };
     writeManifest(manifestPath, manifest);

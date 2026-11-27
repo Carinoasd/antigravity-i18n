@@ -3,6 +3,7 @@ import { listManifests } from '../core/backup.js';
 import { inspectManifest, inspectTarget } from '../core/patcher.js';
 import { rulesStatus } from '../core/rules.js';
 import { TARGET_IDS, TARGET_LABELS } from '../types.js';
+import { hookHint, printBackgroundStatus } from './bg.js';
 import { getToolHome, pct, resolveTargets, sym, userHome } from './common.js';
 
 export interface StatusOptions {
@@ -60,7 +61,7 @@ export async function statusCommand(opts: StatusOptions = {}): Promise<number> {
     console.log(`  ${sym.dot} 套用時間：${m.appliedAt}　工具版本：${m.toolVersion}`);
     console.log(`  ${sym.dot} ${m.runtime ? '靜態層' : ''}覆蓋率：${pct(m.stats.coverage)}（${m.stats.matchedKeys}/${m.stats.totalKeys} 條詞彙，共 ${m.stats.totalHits} 處）`);
     if (m.runtime) {
-      console.log(`  ${sym.dot} 執行期注入層：已啟用（${m.runtime.entries} 條詞彙，掛載於 ${m.runtime.mainEntry}）`);
+      console.log(`  ${sym.dot} 執行期注入層：已啟用（${m.runtime.entries} 條詞彙，掛載於 ${m.runtime.mainEntry}，掛鉤 v${m.runtime.hookVersion ?? 1}）`);
     } else if (m.kind === 'asar') {
       console.log(`  ${sym.dot} 執行期注入層：${pc.dim('未啟用')}`);
     }
@@ -81,6 +82,14 @@ export async function statusCommand(opts: StatusOptions = {}): Promise<number> {
       const st = await inspectManifest(file);
       console.log(`  ${sym.dot} [${manifest.target}] ${manifest.installRoot}：${manifest.lang}，狀態 ${st.state}`);
     }
+    console.log();
+  }
+
+  if (ids.includes('app')) {
+    console.log(pc.bold('■ 自訂背景圖（App）'));
+    printBackgroundStatus(home, '  ');
+    const hint = hookHint(home);
+    if (hint && listManifests(home, 'app').length > 0) console.log(`  ${sym.warn} ${pc.yellow(hint)}`);
     console.log();
   }
 

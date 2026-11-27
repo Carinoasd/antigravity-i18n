@@ -7,6 +7,7 @@
 - 🔒 套用前自動計算 SHA-256、備份原始檔並寫入 Manifest，可**一鍵無損還原**
 - 🧪 `--dry-run` 先預覽命中字串數與覆蓋率，不動任何檔案
 - 🪶 **零侵入模式**：只安裝全域規則，讓 AI 全程以中文回覆，完全不修改安裝檔
+- 🖼️ **自訂背景圖**（App）：`bg set` 一行設定，換圖、調整透明度不需重新套用
 - ✅ 內建 CI 詞庫驗證器（key 一致性、佔位符、保護詞、繁簡用語檢查）
 
 > ⚠️ 本專案為社群專案，與 Google 無關。修改應用程式檔案有風險，請先用 `--dry-run` 預覽，並確認 `restore` 可正常運作。
@@ -152,6 +153,44 @@ description: "一律使用繁體中文（台灣）回覆，並在說明介面操
 - 安裝某一語系時，會自動移除另一語系由本工具建立的規則，避免衝突。
 - 不會覆蓋或刪除你自己建立的同名規則檔（除非加上 `--force`）。
 
+### `bg`（別名 `background`）
+
+自訂 Antigravity **App** 的背景圖。設定存於 `~/.antigravity-i18n/background.json`（遵守 `ANTIGRAVITY_I18N_HOME`），由 App 主行程掛鉤在每次視窗載入時讀取，所以**換圖或調整參數不需要重新套用 `app.asar`**，重新開啟視窗即生效。
+
+```bash
+antigravity-i18n bg set <imagePath> [--opacity <0.01-1>] [--blur <px>] [--size <cover|contain|auto>] [--position <cssPosition>] [--mode <overlay|underlay>]
+antigravity-i18n bg status
+antigravity-i18n bg on
+antigravity-i18n bg off
+antigravity-i18n bg clear
+```
+
+| 選項 | 預設 | 說明 |
+| --- | --- | --- |
+| `--opacity` | `0.12` | 不透明度，0.01 ~ 1 |
+| `--blur` | `0` | 模糊程度（像素，0 ~ 100） |
+| `--size` | `cover` | `cover`、`contain`、`auto` |
+| `--position` | `center` | CSS `background-position`，例如 `top right`、`50% 20%` |
+| `--mode` | `overlay` | `overlay`：疊在介面最上層（`z-index: 99999`，不擋點擊、不會被不透明面板遮住）；`underlay`：放在介面底層（`z-index: -1`，並把 `html` / `body` 背景設為透明） |
+
+- 支援 `.png`、`.jpg`、`.jpeg`、`.webp`、`.gif`，檔案上限 **10 MB**；相對路徑會轉成絕對路徑。
+- 背景圖層為 `position: fixed; inset: 0; pointer-events: none`，並帶有 `data-antigravity-i18n-skip`，不會攔截滑鼠，也不會被翻譯 runtime 處理。
+- 與翻譯共用同一個主行程掛鉤：外部網站（內建瀏覽器開啟的網頁）不會套用背景圖。
+- 讀檔失敗、圖片遺失或格式異常時只在主控台警告，不影響 App 啟動與翻譯。
+- `bg off` 暫時停用並保留設定；臨時關閉也可以用環境變數 `ANTIGRAVITY_I18N_NO_BG=1` 啟動 Antigravity。
+
+前置條件：背景圖由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤；`bg status` 與 `status` 會提示目前狀態。
+
+**WSL**：Windows 版 Antigravity 讀的是 Windows 家目錄下的 `C:\Users\<你>\.antigravity-i18n\background.json`。在 WSL 中執行 `bg` 指令時會：
+
+- 把 `/mnt/<磁碟>/...` 圖片路徑一併記錄成 Windows 路徑（例如 `/mnt/c/Users/me/bg.png` → `C:\Users\me\bg.png`）
+- 自動把設定檔同步鏡像到 Windows 家目錄（透過 `cmd.exe` 取得 `%USERPROFILE%`；也可以用 `ANTIGRAVITY_I18N_WIN_HOME=C:\Users\<你>` 指定）
+- 建議把圖片放在 Windows 磁碟（`/mnt/c/...`）；放在 WSL 檔案系統時，只有 WSL 執行中 Windows 才讀得到
+
+```bash
+antigravity-i18n bg set /mnt/c/Users/me/Pictures/wallpaper.jpg --opacity 0.15 --blur 2
+```
+
 ### `validate`
 
 CI 用詞庫驗證器，通過回傳 exit code `0`，失敗回傳 `1`。
@@ -281,6 +320,7 @@ Electron / VS Code 的 bundle 裡，`"Off"`、`"Run"` 這類短字串常常同�
 
 ```
 ~/.antigravity-i18n/          # 可用環境變數 ANTIGRAVITY_I18N_HOME 覆寫
+├── background.json           # 自訂背景圖設定（bg 指令）
 ├── manifests/
 │   └── ide-1a2b3c4d5e6f.json # 每個安裝路徑一份
 └── backups/
@@ -327,9 +367,12 @@ src/
 │   ├── backup.ts          # SHA-256、備份、Manifest
 │   ├── patcher.ts         # 套用 / 狀態 / 還原
 │   ├── runtime.ts         # 執行期注入層：產生 runtime 腳本與主行程掛鉤
+│   ├── background.ts      # 背景圖設定：驗證、WSL 路徑轉換與鏡像
 │   └── rules.ts           # 全域規則
-├── runtime/overlay.ts     # 注入 renderer 的 DOM 翻譯 runtime（零依賴、自足）
-└── commands/              # status / apply / restore / rules / validate
+├── runtime/
+│   ├── overlay.ts         # 注入 renderer 的 DOM 翻譯 runtime（零依賴、自足）
+│   └── background.ts      # 背景圖：主行程讀取設定 + renderer 注入圖層（皆序列化進掛鉤）
+└── commands/              # status / apply / restore / rules / bg / validate
 locales/                   # 詞庫（zh-TW、zh-CN 各 7 個模組）
 tests/                     # vitest 單元測試
 ```

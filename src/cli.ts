@@ -2,6 +2,7 @@
 import { Argument, Command, Option } from 'commander';
 import pc from 'picocolors';
 import { applyCommand } from './commands/apply.js';
+import { bgClearCommand, bgSetCommand, bgStatusCommand, bgToggleCommand } from './commands/bg.js';
 import { CliError } from './commands/common.js';
 import { restoreCommand } from './commands/restore.js';
 import { rulesCommand } from './commands/rules.js';
@@ -81,6 +82,36 @@ program
   $ antigravity-i18n rules remove`,
   )
   .action(async (action: string, opts) => run(() => rulesCommand(action, opts)));
+
+const bg = program
+  .command('bg')
+  .alias('background')
+  .description('自訂 Antigravity App 背景圖（換圖不需重新套用 app.asar）')
+  .addHelpText(
+    'after',
+    `
+範例：
+  $ antigravity-i18n bg set ~/Pictures/wallpaper.jpg
+  $ antigravity-i18n bg set ./bg.png --opacity 0.2 --blur 4 --size contain --position "top right"
+  $ antigravity-i18n bg set /mnt/c/Users/me/Pictures/bg.webp --mode underlay
+  $ antigravity-i18n bg off
+  $ antigravity-i18n bg status
+
+背景圖由 App 主行程掛鉤載入，需先執行一次 apply --target app（預設啟用執行期注入層）。`,
+  );
+
+bg.command('set <imagePath>')
+  .description('設定背景圖（.png / .jpg / .jpeg / .webp / .gif，上限 10 MB）')
+  .option('--opacity <0.01-1>', '不透明度', '0.12')
+  .option('--blur <px>', '模糊程度（像素）', '0')
+  .addOption(new Option('--size <size>', '背景尺寸').choices(['cover', 'contain', 'auto']).default('cover'))
+  .option('--position <cssPosition>', 'CSS background-position，例如 center、top right、50% 20%', 'center')
+  .addOption(new Option('--mode <mode>', 'overlay：覆蓋在介面上（不擋點擊）；underlay：放在介面底層').choices(['overlay', 'underlay']).default('overlay'))
+  .action(async (imagePath: string, opts) => run(() => bgSetCommand(imagePath, opts)));
+bg.command('status').description('顯示背景圖設定與狀態').action(async () => run(() => bgStatusCommand()));
+bg.command('on').description('啟用背景圖').action(async () => run(() => bgToggleCommand(true)));
+bg.command('off').description('暫時停用背景圖（保留設定）').action(async () => run(() => bgToggleCommand(false)));
+bg.command('clear').description('清除背景圖設定檔').action(async () => run(() => bgClearCommand()));
 
 program
   .command('validate')

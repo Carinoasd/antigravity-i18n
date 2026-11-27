@@ -38,13 +38,17 @@ node dist/cli.js validate
   - `src/config/paths.ts`：只負責路徑偵測，候選路徑函式保持純函式（以 `PathEnv` 注入平台資訊）。
   - `src/core/asar.ts`：asar 操作一律經過 `AsarArchiver` 介面，方便注入假實作測試。
   - `src/core/translator.ts`：靜態替換引擎，只替換完整字串常值；短字串只在 UI 語境替換。
-  - `src/core/runtime.ts`：產生 runtime 腳本與主行程掛鉤。
+  - `src/core/runtime.ts`：產生 runtime 腳本與主行程掛鉤（含背景圖載入）。掛鉤行為改變時遞增 `HOOK_VERSION`。
+  - `src/core/background.ts`：背景圖設定檔的驗證、讀寫、WSL 路徑轉換與鏡像。
   - `src/runtime/overlay.ts`：注入 renderer 的 DOM 翻譯 runtime。
-- **`src/runtime/overlay.ts` 的特殊規則**：此函式會被 `toString()` 序列化注入頁面，因此
+  - `src/runtime/background.ts`：背景圖的主行程讀取函式與 renderer 注入函式。
+- **`src/runtime/` 的特殊規則**：這裡的函式會被 `toString()` 序列化，內嵌進主行程掛鉤或注入頁面，因此
   - 必須完全自足：不可引用模組層級變數、import 或其他函式
   - 零依賴，只用瀏覽器內建 API
   - 不可使用會產生 helper 的 TS 語法（enum、decorator、參數屬性）
   - 不可移除或縮減保護區域（`<code>`、`<pre>`、`.monaco-editor`、`.xterm`、`[contenteditable]`、表單欄位內容、Markdown 正文）
+  - 任何錯誤只能 `console.warn`，**絕不可拋出**：掛鉤出錯不得影響 App 啟動，背景圖出錯不得影響翻譯
+  - 背景圖層必須維持 `pointer-events: none` 與 `data-antigravity-i18n-skip`
 - CLI 的使用者訊息使用繁體中文；程式碼識別字使用英文。
 
 ## 安全原則（不可違反）
@@ -55,7 +59,9 @@ node dist/cli.js validate
 4. **重新套用一律以原始檔為來源**（備份或未修改的檔案），不可在已翻譯的內容上再翻譯或再注入。
 5. 注入的程式碼必須有明確的開始／結束標記，可偵測、可移除，且出錯時不得影響 App 啟動。
 6. 測試只能操作暫存目錄，**不可**讀寫使用者真實的 Antigravity 安裝或家目錄。
-   需要工具資料目錄時，設定 `ANTIGRAVITY_I18N_HOME` 指向暫存目錄。
+   需要工具資料目錄時，設定 `ANTIGRAVITY_I18N_HOME` 指向暫存目錄；
+   會觸發 WSL 鏡像的測試，另外設定 `ANTIGRAVITY_I18N_WIN_HOME`（或注入 `wsl` 參數），避免寫入真實的 Windows 家目錄。
+7. 使用者提供的值寫進 CSS / JS 前必須驗證（例如背景圖 `--position` 只允許安全字元），主行程讀取時再驗證一次。
 
 ## 詞庫與繁簡用語準則
 
@@ -102,9 +108,10 @@ node dist/cli.js validate
 src/cli.ts                 commander 入口
 src/types.ts               共用型別、語系／目標／模組常數
 src/config/paths.ts        各平台（含 WSL）安裝路徑偵測
-src/core/                  asar / locales / translator / backup / patcher / runtime / rules
+src/core/                  asar / locales / translator / backup / patcher / runtime / background / rules
 src/runtime/overlay.ts     renderer 端 DOM 翻譯 runtime
-src/commands/              status / apply / restore / rules / validate
+src/runtime/background.ts  背景圖：主行程讀取 + renderer 注入
+src/commands/              status / apply / restore / rules / bg / validate
 locales/                   zh-TW、zh-CN 各 7 個模組 + protected-terms.json
 tests/                     vitest 單元測試（runtime 測試使用 jsdom）
 ```
