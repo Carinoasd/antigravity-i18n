@@ -7,7 +7,7 @@
 - 🔒 套用前自動計算 SHA-256、備份原始檔並寫入 Manifest，可**一鍵無損還原**
 - 🧪 `--dry-run` 先預覽命中字串數與覆蓋率，不動任何檔案
 - 🪶 **零侵入模式**：只安裝全域規則，讓 AI 全程以中文回覆，完全不修改安裝檔
-- 🖼️ **自訂背景圖**（App）：`bg set` 一行設定，換圖、調整透明度不需重新套用
+- 🖼️ **自訂背景圖**（App）：`bg set` 使用自己的圖片，或 `bg preset` 套用 5 款內建純 CSS 漸層；`--tint` 加上可讀性遮罩；換圖、換預設都不需重新套用
 - ✅ 內建 CI 詞庫驗證器（key 一致性、佔位符、保護詞、繁簡用語檢查）
 
 > ⚠️ 本專案為社群專案，與 Google 無關。修改應用程式檔案有風險，請先用 `--dry-run` 預覽，並確認 `restore` 可正常運作。
@@ -155,10 +155,12 @@ description: "一律使用繁體中文（台灣）回覆，並在說明介面操
 
 ### `bg`（別名 `background`）
 
-自訂 Antigravity **App** 的背景圖。設定存於 `~/.antigravity-i18n/background.json`（遵守 `ANTIGRAVITY_I18N_HOME`），由 App 主行程掛鉤在每次視窗載入時讀取，所以**換圖或調整參數不需要重新套用 `app.asar`**，重新開啟視窗即生效。
+自訂 Antigravity **App** 的背景：可使用自己的圖片，或內建的純 CSS 漸層預設。設定存於 `~/.antigravity-i18n/background.json`（遵守 `ANTIGRAVITY_I18N_HOME`），由 App 主行程掛鉤在每次視窗載入時讀取，所以**換圖或調整參數不需要重新套用 `app.asar`**，重新開啟視窗即生效。
 
 ```bash
-antigravity-i18n bg set <imagePath> [--opacity <0.01-1>] [--blur <px>] [--size <cover|contain|auto>] [--position <cssPosition>] [--mode <overlay|underlay>]
+antigravity-i18n bg set <imagePath> [--opacity <0.01-1>] [--blur <px>] [--size <cover|contain|auto>] [--position <cssPosition>] [--mode <overlay|underlay>] [--tint <cssColor>]
+antigravity-i18n bg preset <name> [--opacity <0.01-1>] [--blur <px>] [--mode <overlay|underlay>] [--tint <cssColor>]
+antigravity-i18n bg presets
 antigravity-i18n bg status
 antigravity-i18n bg on
 antigravity-i18n bg off
@@ -172,19 +174,64 @@ antigravity-i18n bg clear
 | `--size` | `cover` | `cover`、`contain`、`auto` |
 | `--position` | `center` | CSS `background-position`，例如 `top right`、`50% 20%` |
 | `--mode` | `overlay` | `overlay`：疊在介面最上層（`z-index: 99999`，不擋點擊、不會被不透明面板遮住）；`underlay`：放在介面底層（`z-index: -1`，並把 `html` / `body` 背景設為透明） |
+| `--tint` | 不套用 | 可讀性遮罩：在背景上疊一層單色濾鏡，例如 `"rgba(0,0,0,0.25)"`、`"#00000040"`；`none` 清除 |
+
+`--size` 與 `--position` 只適用於圖片；預設一律以 `cover` / `center` 鋪滿視窗。
+
+#### 內建預設（純 CSS 漸層）
+
+不需要任何圖片檔，幾乎沒有記憶體開銷：
+
+| 名稱 | 中文 | 說明 |
+| --- | --- | --- |
+| `aurora` | 極光 | 青綠與藍紫交織的極光，冷色調、層次柔和 |
+| `nebula` | 星雲 | 深空中的洋紅與紫色星雲，帶微弱光暈 |
+| `sunset` | 霓虹夕陽 | 橘、粉、紫的霓虹漸層，溫暖鮮明 |
+| `midnight` | 深夜藍 | 低調的深藍漸層，適合長時間寫程式 |
+| `forest` | 靜謐森林 | 墨綠與苔綠的柔和漸層，安靜不刺眼 |
+
+```bash
+# 列出所有預設
+antigravity-i18n bg presets
+
+# 套用極光，不透明度 0.2
+antigravity-i18n bg preset aurora --opacity 0.2
+
+# 深夜藍 + 25% 黑色遮罩，讓程式碼更清楚
+antigravity-i18n bg preset midnight --opacity 0.3 --tint "rgba(0,0,0,0.25)"
+
+# 霓虹夕陽放在介面底層
+antigravity-i18n bg preset sunset --mode underlay --tint "#00000040"
+```
+
+預設與圖片寫入同一份 `background.json`（`kind` 為 `preset` 或 `image`），可以隨時互相切換。預設的漸層表內嵌在主行程掛鉤裡，因此**切換預設不需要重新套用**；只有在工具更新、新增了預設時，才需要 `apply --target app --force` 一次。
+
+#### 可讀性遮罩 `--tint`
+
+遮罩與背景放在同一個圖層，會跟著 `--opacity` 一起淡化，用來壓低背景的對比、讓文字與程式碼更易讀：
+
+```bash
+antigravity-i18n bg set ~/Pictures/wallpaper.jpg --opacity 0.25 --tint "rgba(0,0,0,0.35)"
+antigravity-i18n bg set ~/Pictures/wallpaper.jpg --tint none   # 移除遮罩
+```
+
+為了防止 CSS 注入，`--tint` 只接受 `#hex`（3 / 4 / 6 / 8 位）、`rgb()`、`rgba()`、`hsl()`、`hsla()`、`transparent`、`black`、`white` 或 `none`；主行程與頁面注入時都會再驗證一次，不合法的值會被忽略。
 
 - 支援 `.png`、`.jpg`、`.jpeg`、`.webp`、`.gif`，檔案上限 **10 MB**；相對路徑會轉成絕對路徑。
 - 背景圖層為 `position: fixed; inset: 0; pointer-events: none`，並帶有 `data-antigravity-i18n-skip`，不會攔截滑鼠，也不會被翻譯 runtime 處理。
+- `--blur` 大於 0 時，圖層會向外延伸 `blur × 2` 像素（例如 `--blur 4` → `inset: -8px`），避免視窗四邊出現淡白／透明的模糊暈邊。
+- 向下相容：舊版工具寫入、沒有 `kind` 欄位的 `background.json` 會被視為圖片設定，照常運作。
 - 與翻譯共用同一個主行程掛鉤：外部網站（內建瀏覽器開啟的網頁）不會套用背景圖。
 - 讀檔失敗、圖片遺失或格式異常時只在主控台警告，不影響 App 啟動與翻譯。
 - `bg off` 暫時停用並保留設定；臨時關閉也可以用環境變數 `ANTIGRAVITY_I18N_NO_BG=1` 啟動 Antigravity。
 
-前置條件：背景圖由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤；`bg status` 與 `status` 會提示目前狀態。
+前置條件：背景圖由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤（目前為 v3：v2 支援圖片，v3 加上預設與遮罩）；`bg status` 與 `status` 會提示目前狀態。
 
 **WSL**：Windows 版 Antigravity 讀的是 Windows 家目錄下的 `C:\Users\<你>\.antigravity-i18n\background.json`。在 WSL 中執行 `bg` 指令時會：
 
 - 把 `/mnt/<磁碟>/...` 圖片路徑一併記錄成 Windows 路徑（例如 `/mnt/c/Users/me/bg.png` → `C:\Users\me\bg.png`）
 - 自動把設定檔同步鏡像到 Windows 家目錄（透過 `cmd.exe` 取得 `%USERPROFILE%`；也可以用 `ANTIGRAVITY_I18N_WIN_HOME=C:\Users\<你>` 指定）
+  - 查詢前會先執行 `chcp 65001` 切換為 UTF-8，避免非 UTF-8（例如 cp950 / cp936）的中文 Windows 上使用者名稱變成亂碼；轉換後的目錄必須確實存在才會採用
 - 建議把圖片放在 Windows 磁碟（`/mnt/c/...`）；放在 WSL 檔案系統時，只有 WSL 執行中 Windows 才讀得到
 
 ```bash
@@ -368,6 +415,7 @@ src/
 │   ├── patcher.ts         # 套用 / 狀態 / 還原
 │   ├── runtime.ts         # 執行期注入層：產生 runtime 腳本與主行程掛鉤
 │   ├── background.ts      # 背景圖設定：驗證、WSL 路徑轉換與鏡像
+│   ├── presets.ts         # 內建純 CSS 漸層預設（唯一來源，內嵌進掛鉤）
 │   └── rules.ts           # 全域規則
 ├── runtime/
 │   ├── overlay.ts         # 注入 renderer 的 DOM 翻譯 runtime（零依賴、自足）

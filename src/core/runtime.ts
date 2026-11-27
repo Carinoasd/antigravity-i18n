@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { applyBackground, readBackgroundPayload } from '../runtime/background.js';
+import { presetImages } from './presets.js';
 import { antigravityI18nOverlay, type OverlayOptions } from '../runtime/overlay.js';
 import type { Dictionary } from '../types.js';
 
@@ -26,8 +27,9 @@ export const RUNTIME_MARKER = '/* antigravity-i18n:runtime */';
  * 掛鉤版本：
  * - 1：翻譯 runtime
  * - 2：翻譯 runtime + 自訂背景圖
+ * - 3：背景圖支援內建漸層預設（bg preset）與可讀性遮罩（--tint）
  */
-export const HOOK_VERSION = 2;
+export const HOOK_VERSION = 3;
 
 export type ModuleFormat = 'cjs' | 'esm';
 
@@ -115,6 +117,7 @@ function installSource(): string {
   return `var __agi18nIsInternalUrl = ${inlineFn(isInternalUrl, 'isInternalUrl', '__agi18nIsInternalUrl')};
     var __agi18nReadBg = ${inlineFn(readBackgroundPayload, 'readBackgroundPayload', '__agi18nReadBg')};
     var __agi18nApplyBg = ${JSON.stringify(applyBackground.toString())};
+    var __agi18nPresets = ${JSON.stringify(presetImages())};
     function __agi18nInstall(app, code, readBg) {
     if (!app || (!code && !readBg) || globalThis.__ANTIGRAVITY_I18N_HOOK__) return;
     globalThis.__ANTIGRAVITY_I18N_HOOK__ = ${HOOK_VERSION};
@@ -172,7 +175,7 @@ import * as __agi18nUrl from 'node:url';
       console.warn('[antigravity-i18n] runtime not loaded:', e && e.message);
     }
     var bgCache = {};
-    __agi18nInstall(app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache); });
+    __agi18nInstall(app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache, __agi18nPresets); });
   } catch (e) {
     console.warn('[antigravity-i18n] runtime hook disabled:', e && e.message);
   }
@@ -194,7 +197,7 @@ ${version}
       console.warn('[antigravity-i18n] runtime not loaded:', e && e.message);
     }
     var bgCache = {};
-    __agi18nInstall(require('electron').app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache); });
+    __agi18nInstall(require('electron').app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache, __agi18nPresets); });
   } catch (e) {
     console.warn('[antigravity-i18n] runtime hook disabled:', e && e.message);
   }

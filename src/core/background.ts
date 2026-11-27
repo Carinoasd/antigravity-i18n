@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { WSL_WINDOWS_DRIVE, defaultPathEnv, isWsl, type PathEnv } from '../config/paths.js';
-import type { BackgroundMode, BackgroundSize } from '../runtime/background.js';
+import type { BackgroundKind, BackgroundMode, BackgroundSize } from '../runtime/background.js';
+import { BACKGROUND_PRESETS } from './presets.js';
 
 /**
  * 自訂背景圖設定（專用於 Antigravity App）。
@@ -30,11 +31,20 @@ export const BACKGROUND_MODES: readonly BackgroundMode[] = ['overlay', 'underlay
 export interface BackgroundConfig {
   schemaVersion: 1;
   enabled: boolean;
-  /** 正規化後的絕對路徑（以執行 CLI 的系統為準） */
-  imagePath: string;
+  /**
+   * 背景種類：`image`（圖片）或 `preset`（內建漸層）。
+   * 舊版（PR #2）寫入的設定沒有此欄位，一律視為 `image`。
+   */
+  kind?: BackgroundKind;
+  /** kind 為 image：正規化後的絕對路徑（以執行 CLI 的系統為準） */
+  imagePath?: string;
   /** WSL 中設定時，對應的 Windows 路徑（供 Windows 側 Electron 讀取） */
   windowsPath?: string;
-  mime: string;
+  mime?: string;
+  /** kind 為 preset：預設名稱 */
+  preset?: string;
+  /** 可讀性遮罩顏色；未設定表示不套用 */
+  tint?: string;
   opacity: number;
   blur: number;
   size: BackgroundSize;
@@ -98,6 +108,28 @@ export function parsePosition(input: string | undefined): string {
   const v = input.trim().replace(/\s+/g, ' ');
   if (!/^[A-Za-z0-9%.\s-]{1,64}$/.test(v)) {
     throw new BackgroundError(`--position 只能包含英數字、空白、%、. 與 -，例如 center、top right、50% 20%（收到「${input}」）`);
+  }
+  return v;
+}
+
+/**
+ * 可讀性遮罩只接受安全的 CSS 顏色值：`#hex`（3/4/6/8 位）、`rgb()` / `rgba()` /
+ * `hsl()` / `hsla()`、`transparent` / `black` / `white`，或 `none`（清除）。
+ * 這個規則與 src/runtime/background.ts 內的 TINT_RE 必須一致（測試會比對）。
+ */
+export const TINT_RE =
+  /^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgba?|hsla?)\(\s*[0-9.+\-%\s,/]*\d[0-9.+\-%\s,/]*(?:(?:deg|turn|rad|grad)[0-9.+\-%\s,/]*)?\)|transparent|black|white)$/i;
+
+/** 回傳正規化的 tint；`none` 或未提供時回傳 undefined（不套用） */
+export function parseTint(input: string | undefined): string | undefined {
+  if (input === undefined) return undefined;
+  const v = input.trim().replace(/\s+/g, ' ');
+  if (v.toLowerCase() === 'none') return undefined;
+  // rgb()/hsl() 的括號內至少要有一個數字（規則已寫在 TINT_RE 內，三端一致）
+  if (v.length > 64 || !TINT_RE.test(v)) {
+    throw new BackgroundError(
+      `--tint 只接受 #hex、rgb()、rgba()、hsl()、hsla()、transparent、black、white 或 none，例如 "rgba(0,0,0,0.25)"、"#00000040"（收到「${input}」）`,
+    );
   }
   return v;
 }
@@ -173,15 +205,24 @@ const defaultRunner: CommandRunner = (cmd, args) =>
 /**
  * 找出 WSL 對應的 Windows 家目錄（WSL 路徑形式，例如 `/mnt/c/Users/me`）：
  * 1. 環境變數 `ANTIGRAVITY_I18N_WIN_HOME`（可寫 `C:\Users\me` 或 `/mnt/c/Users/me`）
- * 2. 透過 WSL interop 執行 `cmd.exe /c echo %USERPROFILE%`
+ * 2. 透過 WSL interop 執行 `cmd.exe /c "chcp 65001 >nul & echo %USERPROFILE%"`，且目錄必須存在
  * 3. `/mnt/c/Users` 下只有一位使用者時使用該使用者
  */
-export function resolveWindowsHome(pe: PathEnv, run: CommandRunner = defaultRunner): string | null {
+export function resolveWindowsHome(
+  pe: PathEnv,
+  run: CommandRunner = defaultRunner,
+  exists: (p: string) => boolean = (p) => fs.existsSync(p),
+): string | null {
   const override = pe.env.ANTIGRAVITY_I18N_WIN_HOME?.trim();
   if (override) return override.startsWith('/') ? override : windowsToWslPath(override);
   try {
-    const out = run('cmd.exe', ['/d', '/c', 'echo %USERPROFILE%']).trim().split(/\r?\n/).pop()?.trim() ?? '';
-    if (/^[A-Za-z]:\\/.test(out)) return windowsToWslPath(out);
+    // 先切到 UTF-8 codepage，避免非 UTF-8 系統（例如 cp950 / cp936）上的中文使用者名稱變成亂碼
+    const out = run('cmd.exe', ['/d', '/c', 'chcp 65001 >nul & echo %USERPROFILE%']).trim().split(/\r?\n/).pop()?.trim() ?? '';
+    if (/^[A-Za-z]:\\/.test(out)) {
+      const wslPath = windowsToWslPath(out);
+      // 驗證轉換後的目錄確實存在才採用（亂碼路徑不會存在）
+      if (wslPath && exists(wslPath)) return wslPath;
+    }
   } catch {
     /* interop 未啟用 */
   }
@@ -215,7 +256,10 @@ export function readBackgroundConfig(home: string): BackgroundConfig | null {
   if (!fs.existsSync(file)) return null;
   try {
     const cfg = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) as BackgroundConfig;
-    return cfg && typeof cfg.imagePath === 'string' ? cfg : null;
+    if (!cfg || typeof cfg !== 'object') return null;
+    if (cfg.kind === 'preset') return typeof cfg.preset === 'string' ? cfg : null;
+    // 沒有 kind 的舊設定視為圖片
+    return typeof cfg.imagePath === 'string' ? { ...cfg, kind: 'image' } : null;
   } catch {
     throw new BackgroundError(`背景圖設定檔格式錯誤：${file}（可執行 bg clear 後重新設定）`);
   }
@@ -261,6 +305,7 @@ export interface SetBackgroundOptions {
   size?: string;
   position?: string;
   mode?: string;
+  tint?: string;
   cwd?: string;
   /** 測試用：注入 WSL 狀態；未提供時自動偵測 */
   wsl?: WslContext | null;
@@ -269,9 +314,11 @@ export interface SetBackgroundOptions {
 
 export function setBackground(home: string, imagePath: string, opts: SetBackgroundOptions = {}): WriteResult {
   const img = validateImage(imagePath, opts.cwd);
+  const tint = parseTint(opts.tint);
   const cfg: BackgroundConfig = {
     schemaVersion: 1,
     enabled: true,
+    kind: 'image',
     imagePath: img.absPath,
     mime: img.mime,
     opacity: parseOpacity(opts.opacity),
@@ -279,6 +326,7 @@ export function setBackground(home: string, imagePath: string, opts: SetBackgrou
     size: parseSize(opts.size),
     position: parsePosition(opts.position),
     mode: parseMode(opts.mode),
+    ...(tint ? { tint } : {}),
     updatedAt: (opts.now ?? new Date()).toISOString(),
   };
   const wsl = opts.wsl !== undefined ? opts.wsl : detectWslContext();
@@ -293,6 +341,43 @@ export function setBackground(home: string, imagePath: string, opts: SetBackgrou
   const r = writeWithMirror(home, cfg, wsl);
   r.warnings.unshift(...extra);
   return r;
+}
+
+export interface SetPresetOptions {
+  opacity?: string | number;
+  blur?: string | number;
+  tint?: string;
+  mode?: string;
+  wsl?: WslContext | null;
+  now?: Date;
+}
+
+/** 列出內建預設名稱 */
+export function presetNames(): string[] {
+  return Object.keys(BACKGROUND_PRESETS);
+}
+
+/** bg preset <name>：寫入同一份 background.json（含 WSL 鏡像） */
+export function setPreset(home: string, name: string, opts: SetPresetOptions = {}): WriteResult {
+  const key = name.trim().toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(BACKGROUND_PRESETS, key)) {
+    throw new BackgroundError(`未知的預設「${name}」，可用：${presetNames().join('、')}（執行 bg presets 查看說明）`);
+  }
+  const tint = parseTint(opts.tint);
+  const cfg: BackgroundConfig = {
+    schemaVersion: 1,
+    enabled: true,
+    kind: 'preset',
+    preset: key,
+    opacity: parseOpacity(opts.opacity),
+    blur: parseBlur(opts.blur),
+    size: 'cover',
+    position: 'center',
+    mode: parseMode(opts.mode),
+    ...(tint ? { tint } : {}),
+    updatedAt: (opts.now ?? new Date()).toISOString(),
+  };
+  return writeWithMirror(home, cfg, opts.wsl !== undefined ? opts.wsl : detectWslContext());
 }
 
 /** bg on / bg off：只切換啟用狀態，保留其他設定 */
@@ -323,6 +408,8 @@ export interface BackgroundStatus {
   config: BackgroundConfig | null;
   imageExists: boolean;
   imageSize?: number;
+  /** kind 為 preset 時，名稱是否為內建預設 */
+  presetKnown?: boolean;
   /** WSL 鏡像檔（存在時） */
   mirror?: string;
   mirrorInSync?: boolean;
@@ -332,7 +419,9 @@ export function backgroundStatus(home: string, opts: { wsl?: WslContext | null }
   const file = backgroundConfigPath(home);
   const config = readBackgroundConfig(home);
   const st: BackgroundStatus = { file, config, imageExists: false };
-  if (config) {
+  if (config?.kind === 'preset') {
+    st.presetKnown = Object.prototype.hasOwnProperty.call(BACKGROUND_PRESETS, config.preset ?? '');
+  } else if (config?.imagePath) {
     try {
       const s = fs.statSync(config.imagePath);
       st.imageExists = s.isFile();

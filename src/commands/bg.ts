@@ -7,9 +7,11 @@ import {
   clearBackground,
   setBackground,
   setBackgroundEnabled,
+  setPreset,
   type BackgroundConfig,
   type WriteResult,
 } from '../core/background.js';
+import { BACKGROUND_PRESETS } from '../core/presets.js';
 import { HOOK_VERSION } from '../core/runtime.js';
 import { CliError, getToolHome, sym, warn } from './common.js';
 
@@ -19,14 +21,28 @@ export interface BgSetOptions {
   size?: string;
   position?: string;
   mode?: string;
+  tint?: string;
+}
+
+export interface BgPresetOptions {
+  opacity?: string;
+  blur?: string;
+  tint?: string;
+  mode?: string;
 }
 
 function formatBytes(n: number): string {
   return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${(n / 1024).toFixed(1)} KB`;
 }
 
+function paramsLine(cfg: BackgroundConfig): string {
+  const tint = `遮罩：${cfg.tint ?? '無'}`;
+  if (cfg.kind === 'preset') return `不透明度：${cfg.opacity}　模糊：${cfg.blur}px　模式：${cfg.mode}　${tint}`;
+  return `不透明度：${cfg.opacity}　模糊：${cfg.blur}px　尺寸：${cfg.size}　位置：${cfg.position}　模式：${cfg.mode}　${tint}`;
+}
+
 function printConfig(cfg: BackgroundConfig): void {
-  console.log(`  ${sym.dot} 不透明度：${cfg.opacity}　模糊：${cfg.blur}px　尺寸：${cfg.size}　位置：${cfg.position}　模式：${cfg.mode}`);
+  console.log(`  ${sym.dot} ${paramsLine(cfg)}`);
 }
 
 /** 背景圖需要 App 已套用 v2 以上的主行程掛鉤 */
@@ -39,7 +55,9 @@ export function hookHint(home: string): string | null {
     return 'App 是以 --no-runtime 套用的，沒有主行程掛鉤，背景圖不會生效。請執行：antigravity-i18n apply --lang <語系> --target app --force';
   }
   if (!manifests.some((m) => (m.runtime?.hookVersion ?? 1) >= HOOK_VERSION)) {
-    return 'App 的主行程掛鉤為舊版，不支援背景圖。請重新套用一次：antigravity-i18n apply --lang <語系> --target app --force';
+    const v = Math.max(...manifests.map((m) => m.runtime?.hookVersion ?? 1));
+    const missing = v < 2 ? '不支援背景圖' : '不支援內建預設（bg preset）與遮罩（--tint）';
+    return `App 的主行程掛鉤為舊版（v${v}，目前為 v${HOOK_VERSION}），${missing}。請重新套用一次：antigravity-i18n apply --lang <語系> --target app --force`;
   }
   return null;
 }
@@ -72,6 +90,31 @@ export async function bgSetCommand(imagePath: string, opts: BgSetOptions): Promi
     else console.log(pc.dim('  重新開啟 Antigravity 視窗（或重新載入）後生效，不需要重新套用 app.asar。'));
     return 0;
   });
+}
+
+export async function bgPresetCommand(name: string, opts: BgPresetOptions): Promise<number> {
+  return wrap(() => {
+    const home = getToolHome();
+    const r = setPreset(home, name, opts);
+    const p = BACKGROUND_PRESETS[r.config.preset!]!;
+    console.log(`${sym.ok} 已套用背景預設：${r.config.preset}（${p.label}）`);
+    printConfig(r.config);
+    printWrite(r);
+    const hint = hookHint(home);
+    if (hint) warn(hint);
+    else console.log(pc.dim('  重新開啟 Antigravity 視窗（或重新載入）後生效，不需要重新套用 app.asar。'));
+    return 0;
+  });
+}
+
+export async function bgPresetsCommand(): Promise<number> {
+  console.log(pc.bold('\n內建背景預設（純 CSS 漸層，不需圖片檔）\n'));
+  const width = Math.max(...Object.keys(BACKGROUND_PRESETS).map((n) => n.length));
+  for (const [name, p] of Object.entries(BACKGROUND_PRESETS)) {
+    console.log(`  ${pc.bold(name.padEnd(width))}  ${p.label}　${pc.dim(p.description)}`);
+  }
+  console.log(pc.dim('\n  使用：antigravity-i18n bg preset <名稱> [--opacity 0.2] [--tint "rgba(0,0,0,0.25)"]\n'));
+  return 0;
 }
 
 export async function bgToggleCommand(enabled: boolean): Promise<number> {
@@ -108,12 +151,16 @@ export function printBackgroundStatus(home: string, indent = ''): void {
   }
   const state = cfg.enabled ? pc.green('已啟用') : pc.yellow('已停用（設定保留）');
   console.log(`${indent}${sym.ok} 背景圖：${state}`);
-  const exists = st.imageExists ? pc.green(`存在，${formatBytes(st.imageSize ?? 0)}`) : pc.red('找不到檔案');
-  console.log(`${indent}  ${sym.dot} 圖片：${cfg.imagePath}（${exists}）`);
-  if (cfg.windowsPath) console.log(`${indent}  ${sym.dot} Windows 路徑：${cfg.windowsPath}`);
-  console.log(
-    `${indent}  ${sym.dot} 不透明度：${cfg.opacity}　模糊：${cfg.blur}px　尺寸：${cfg.size}　位置：${cfg.position}　模式：${cfg.mode}`,
-  );
+  if (cfg.kind === 'preset') {
+    const p = BACKGROUND_PRESETS[cfg.preset ?? ''];
+    const known = p ? pc.green(p.label) : pc.red('未知的預設（請執行 bg presets 查看可用名稱）');
+    console.log(`${indent}  ${sym.dot} 預設：${cfg.preset}（${known}）`);
+  } else {
+    const exists = st.imageExists ? pc.green(`存在，${formatBytes(st.imageSize ?? 0)}`) : pc.red('找不到檔案');
+    console.log(`${indent}  ${sym.dot} 圖片：${cfg.imagePath}（${exists}）`);
+    if (cfg.windowsPath) console.log(`${indent}  ${sym.dot} Windows 路徑：${cfg.windowsPath}`);
+  }
+  console.log(`${indent}  ${sym.dot} ${paramsLine(cfg)}`);
   console.log(`${indent}  ${sym.dot} 設定檔：${pc.dim(st.file)}`);
   if (st.mirror) {
     const sync = st.mirrorInSync ? pc.green('已同步') : pc.yellow('未同步（請重新執行 bg set 或 bg on）');

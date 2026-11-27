@@ -40,6 +40,8 @@ node dist/cli.js validate
   - `src/core/translator.ts`：靜態替換引擎，只替換完整字串常值；短字串只在 UI 語境替換。
   - `src/core/runtime.ts`：產生 runtime 腳本與主行程掛鉤（含背景圖載入）。掛鉤行為改變時遞增 `HOOK_VERSION`。
   - `src/core/background.ts`：背景圖設定檔的驗證、讀寫、WSL 路徑轉換與鏡像。
+  - `src/core/presets.ts`：內建純 CSS 漸層預設的**唯一來源**；`apply` 時以 JSON 內嵌進掛鉤。
+    預設只能用漸層與顏色值（字元限制 `[A-Za-z0-9#%.,()\s-]`，不可有 `url()`）。新增或修改預設後，使用者需重新 `apply --force` 才會更新掛鉤內的表。
   - `src/runtime/overlay.ts`：注入 renderer 的 DOM 翻譯 runtime。
   - `src/runtime/background.ts`：背景圖的主行程讀取函式與 renderer 注入函式。
 - **`src/runtime/` 的特殊規則**：這裡的函式會被 `toString()` 序列化，內嵌進主行程掛鉤或注入頁面，因此
@@ -49,6 +51,8 @@ node dist/cli.js validate
   - 不可移除或縮減保護區域（`<code>`、`<pre>`、`.monaco-editor`、`.xterm`、`[contenteditable]`、表單欄位內容、Markdown 正文）
   - 任何錯誤只能 `console.warn`，**絕不可拋出**：掛鉤出錯不得影響 App 啟動，背景圖出錯不得影響翻譯
   - 背景圖層必須維持 `pointer-events: none` 與 `data-antigravity-i18n-skip`
+  - 同一條驗證規則（例如 tint 的 `TINT_RE`）在 `src/core/` 與 `src/runtime/` 各有一份時，必須完全一致，並以測試逐一比對同一批輸入
+  - `background.json` 必須向下相容：沒有 `kind` 欄位的舊設定一律視為圖片
 - CLI 的使用者訊息使用繁體中文；程式碼識別字使用英文。
 
 ## 安全原則（不可違反）
@@ -108,7 +112,7 @@ node dist/cli.js validate
 src/cli.ts                 commander 入口
 src/types.ts               共用型別、語系／目標／模組常數
 src/config/paths.ts        各平台（含 WSL）安裝路徑偵測
-src/core/                  asar / locales / translator / backup / patcher / runtime / background / rules
+src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules
 src/runtime/overlay.ts     renderer 端 DOM 翻譯 runtime
 src/runtime/background.ts  背景圖：主行程讀取 + renderer 注入
 src/commands/              status / apply / restore / rules / bg / validate
