@@ -34,8 +34,21 @@ type Spawner = (cmd: string, args: string[]) => { on(event: 'error', fn: (e: Err
 
 const defaultSpawner: Spawner = (cmd, args) => spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: true });
 
+export interface OpenBrowserOptions {
+  platform?: NodeJS.Platform;
+  /**
+   * 是否在 WSL 中執行；未指定時自動偵測（會讀取 /proc/version）。
+   * 測試請明確指定，避免在真實 WSL 環境中得到不同結果。
+   */
+  wsl?: boolean;
+  spawner?: Spawner;
+}
+
 /** 以系統預設瀏覽器開啟網址；失敗時回傳 false（呼叫端改為顯示網址） */
-export function openBrowser(url: string, platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, spawner: Spawner = defaultSpawner): boolean {
+export function openBrowser(url: string, opts: OpenBrowserOptions = {}): boolean {
+  const platform = opts.platform ?? process.platform;
+  const wsl = opts.wsl ?? isWsl(process.env, platform);
+  const spawner = opts.spawner ?? defaultSpawner;
   let cmd: string;
   let args: string[];
   if (platform === 'win32') {
@@ -44,7 +57,7 @@ export function openBrowser(url: string, platform: NodeJS.Platform = process.pla
   } else if (platform === 'darwin') {
     cmd = 'open';
     args = [url];
-  } else if (isWsl(env, platform)) {
+  } else if (platform === 'linux' && wsl) {
     // WSL：用 Windows 的預設瀏覽器開啟（127.0.0.1 在 WSL2 會自動轉送）
     cmd = 'cmd.exe';
     args = ['/c', 'start', '', url];

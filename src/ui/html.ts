@@ -55,8 +55,14 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'bg.tint.navy35': '深藍 35%',
     'bg.mode.overlay': '覆蓋在介面上',
     'bg.mode.underlay': '放在介面底層',
-    'bg.image': '或指定電腦中的圖片路徑',
+    'bg.image': '或直接輸入電腦中的圖片路徑：',
     'bg.useImage': '使用此圖片',
+    'bg.pick': '選擇電腦圖片…',
+    'bg.tooLarge': '圖片超過 10 MB，請選擇較小的圖片',
+    'bg.badType': '只支援 PNG、JPEG、WebP、GIF 圖片',
+    'hint.not-applied': 'App 尚未套用，背景與 Ctrl+Alt+B 面板還不會生效。請按下方「一鍵操作」中任一個套用按鈕（只想要背景、維持英文，就選「只要自訂背景與 Ctrl+Alt+B 面板」）。',
+    'hint.no-runtime': 'App 目前的套用方式沒有載入背景功能。請按下方「一鍵操作」中任一個套用按鈕，重新套用一次即可。',
+    'hint.old-hook': 'App 的背景功能是舊版（v{current}，最新為 v{latest}），部分功能無法使用。請按下方「一鍵操作」中任一個套用按鈕，重新套用一次即可升級。',
     'bg.on': '啟用',
     'bg.off': '停用',
     'bg.clear': '清除設定',
@@ -135,8 +141,14 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'bg.tint.navy35': '深蓝 35%',
     'bg.mode.overlay': '覆盖在界面上',
     'bg.mode.underlay': '放在界面底层',
-    'bg.image': '或指定电脑中的图片路径',
+    'bg.image': '或直接输入电脑中的图片路径：',
     'bg.useImage': '使用此图片',
+    'bg.pick': '选择电脑图片…',
+    'bg.tooLarge': '图片超过 10 MB，请选择较小的图片',
+    'bg.badType': '只支持 PNG、JPEG、WebP、GIF 图片',
+    'hint.not-applied': 'App 尚未应用，背景与 Ctrl+Alt+B 面板还不会生效。请点击下方「一键操作」中任一个应用按钮（只想要背景、保持英文，就选「只要自定义背景与 Ctrl+Alt+B 面板」）。',
+    'hint.no-runtime': 'App 当前的应用方式没有加载背景功能。请点击下方「一键操作」中任一个应用按钮，重新应用一次即可。',
+    'hint.old-hook': 'App 的背景功能是旧版（v{current}，最新为 v{latest}），部分功能无法使用。请点击下方「一键操作」中任一个应用按钮，重新应用一次即可升级。',
     'bg.on': '启用',
     'bg.off': '停用',
     'bg.clear': '清除设置',
@@ -215,8 +227,14 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'en', Record<string, string>> =
     'bg.tint.navy35': 'Navy 35%',
     'bg.mode.overlay': 'Over the UI',
     'bg.mode.underlay': 'Under the UI',
-    'bg.image': 'Or use an image path on this computer',
+    'bg.image': 'Or type an image path on this computer:',
     'bg.useImage': 'Use this image',
+    'bg.pick': 'Choose an image…',
+    'bg.tooLarge': 'The image is larger than 10 MB — please choose a smaller one',
+    'bg.badType': 'Only PNG, JPEG, WebP and GIF images are supported',
+    'hint.not-applied': 'The App is not patched yet, so the background and the Ctrl+Alt+B panel are not active. Click any apply button under "One-click actions" below (pick "Background & Ctrl+Alt+B panel only" to keep the English UI).',
+    'hint.no-runtime': 'The App was patched without the background hook. Click any apply button under "One-click actions" below to re-apply.',
+    'hint.old-hook': 'The App has an old background hook (v{current}, latest is v{latest}), so some features are unavailable. Click any apply button under "One-click actions" below to upgrade.',
     'bg.on': 'Enable',
     'bg.off': 'Disable',
     'bg.clear': 'Clear',
@@ -430,6 +448,8 @@ const SCRIPT = `
     if (res.results && res.results.length === 0) log(t('r.nothing'), 'muted');
     if (res.action) {
       var lines2 = ['bg ' + res.action + ' ✔'];
+      if (res.imagePath) lines2.push(res.imagePath);
+      if (res.mirrorImage) lines2.push(res.mirrorImage);
       if (res.file) lines2.push(res.file);
       if (res.mirror) lines2.push(res.mirror);
       (res.warnings || []).forEach(function (w) { lines2.push('⚠ ' + w); });
@@ -444,6 +464,19 @@ const SCRIPT = `
     if (r.state === 'applied' && r.backgroundOnly) return t('state.applied') + sep() + t('state.bgOnly');
     if (r.state === 'applied' && r.lang) return t('state.applied') + sep() + r.lang;
     return t('state.' + r.state) + (r.reason ? paren(r.reason) : '');
+  }
+
+  /** 掛鉤提示依介面語系顯示，並引導使用者點擊下方的套用按鈕 */
+  function hintText(s) {
+    var h = s.hintInfo;
+    if (!h) return '';
+    if (h.code === 'not-applied') {
+      // 沒偵測到 App、也沒有設定背景時不提示，避免誤導
+      var app = s.targets.filter(function (r) { return r.id === 'app'; })[0];
+      var hasBg = s.background && s.background.config;
+      if ((!app || app.state === 'not-installed') && !hasBg) return '';
+    }
+    return t('hint.' + h.code).replace('{current}', String(h.current || '')).replace('{latest}', String(h.latest || ''));
   }
 
   function renderStatus(s) {
@@ -463,8 +496,9 @@ const SCRIPT = `
     var bg = s.background;
     var bgText = bg.error ? bg.error : !bg.config ? t('bg.state.none') : (bg.config.enabled ? t('bg.state.on') : t('bg.state.off')) + ' · ' + (bg.config.kind === 'preset' ? bg.config.preset : bg.config.imagePath);
     $('bg-state').textContent = bgText;
-    $('hint').textContent = s.hint || '';
-    $('hint').hidden = !s.hint;
+    var hint = hintText(s);
+    $('hint').textContent = hint;
+    $('hint').hidden = !hint;
     if ($('presets').childElementCount === 0) {
       s.presets.forEach(function (p) {
         var b = el('button', presetLabel(p.name, p.label), 'preset');
@@ -520,6 +554,29 @@ const SCRIPT = `
       try { localStorage.setItem('agi18n-ui-lang', lang); } catch (e) {}
       applyLang();
     });
+  });
+  var MAX_UPLOAD = 10 * 1024 * 1024;
+  var ACCEPT = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+  function bgQuery() {
+    return ['opacity', 'blur', 'tint', 'mode'].map(function (k) { return k + '=' + encodeURIComponent($('bg-' + k).value); }).join('&');
+  }
+  function upload(file) {
+    return fetch('/api/bg/upload?' + bgQuery(), {
+      method: 'POST',
+      headers: { 'X-AGI18N-Token': TOKEN, 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    }).then(function (r) {
+      return r.json().catch(function () { return { ok: false, error: 'HTTP ' + r.status }; });
+    });
+  }
+  $('bg-pick').addEventListener('click', function () { $('bg-file').click(); });
+  $('bg-file').addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    this.value = '';
+    if (!file) return;
+    if (file.size > MAX_UPLOAD) { log(t('bg.tooLarge'), 'bad'); return; }
+    if (ACCEPT.indexOf(file.type) < 0) { log(t('bg.badType'), 'bad'); return; }
+    run(t('bg.pick') + ' ' + file.name, function () { return upload(file); });
   });
   $('refresh').addEventListener('click', function () { refresh(); });
   $('lock-retry').addEventListener('click', function () { if (last) run(last.label, last.fn); });
@@ -609,8 +666,12 @@ export function renderUiHtml(opts: UiHtmlOptions): string {
     <label class="ctl"><span data-i18n="bg.blur"></span><input type="range" id="bg-blur" min="0" max="32" step="1" value="0"><span id="bg-blur-v">0px</span></label>
     <label class="ctl"><span data-i18n="bg.tint"></span><select id="bg-tint">${opt('none', 'bg.tint.none')}${opt('rgba(0,0,0,0.25)', 'bg.tint.dark25')}${opt('rgba(0,0,0,0.45)', 'bg.tint.dark45')}${opt('rgba(10,25,60,0.35)', 'bg.tint.navy35')}</select></label>
     <label class="ctl"><span data-i18n="bg.mode"></span><select id="bg-mode">${opt('overlay', 'bg.mode.overlay')}${opt('underlay', 'bg.mode.underlay')}</select></label>
-    <div class="row"><input type="text" id="bg-path" spellcheck="false" aria-label="image path" placeholder="C:\\Users\\me\\Pictures\\wallpaper.jpg"><button type="button" data-act="bg-image" data-i18n="bg.useImage"></button></div>
+    <div class="row">
+      <button type="button" class="primary" id="bg-pick" data-act="bg-pick" data-i18n="bg.pick"></button>
+      <input type="file" id="bg-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+    </div>
     <p class="note" data-i18n="bg.image"></p>
+    <div class="row"><input type="text" id="bg-path" spellcheck="false" aria-label="image path" placeholder="C:\\Users\\me\\Pictures\\wallpaper.jpg"><button type="button" data-act="bg-image" data-i18n="bg.useImage"></button></div>
     <div class="row">
       <button type="button" data-act="bg-on" data-i18n="bg.on"></button>
       <button type="button" data-act="bg-off" data-i18n="bg.off"></button>

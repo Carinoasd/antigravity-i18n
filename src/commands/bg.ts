@@ -45,26 +45,38 @@ function printConfig(cfg: BackgroundConfig): void {
   console.log(`  ${sym.dot} ${paramsLine(cfg)}`);
 }
 
-/** 背景圖需要 App 已套用 v2 以上的主行程掛鉤 */
-export function hookHint(home: string): string | null {
+/** 背景功能的掛鉤狀態（結構化，供圖形控制台依介面語系顯示） */
+export type HookHintInfo = { code: 'not-applied' } | { code: 'no-runtime' } | { code: 'old-hook'; current: number; latest: number };
+
+export function hookHintInfo(home: string): HookHintInfo | null {
   const manifests = listManifests(home, 'app').map((m) => m.manifest);
-  if (manifests.length === 0) {
-    return '尚未對 App 套用中文化。背景圖由 App 主行程掛鉤載入，請執行：antigravity-i18n apply --lang zh-TW --target app';
-  }
-  if (!manifests.some((m) => m.runtime)) {
-    return 'App 是以 --no-runtime 套用的，沒有主行程掛鉤，背景圖不會生效。請執行：antigravity-i18n apply --lang <語系> --target app --force';
-  }
+  if (manifests.length === 0) return { code: 'not-applied' };
+  if (!manifests.some((m) => m.runtime)) return { code: 'no-runtime' };
   if (!manifests.some((m) => (m.runtime?.hookVersion ?? 1) >= HOOK_VERSION)) {
-    const v = Math.max(...manifests.map((m) => m.runtime?.hookVersion ?? 1));
-    const missing =
-      v < 2
-        ? '不支援背景圖'
-        : v < 3
-          ? '不支援內建預設（bg preset）、遮罩（--tint）與介面內背景面板（Ctrl+Alt+B）'
-          : '沒有介面內背景面板（Ctrl+Alt+B）';
-    return `App 的主行程掛鉤為舊版（v${v}，目前為 v${HOOK_VERSION}），${missing}。請重新套用一次：antigravity-i18n apply --lang <語系> --target app --force`;
+    return { code: 'old-hook', current: Math.max(...manifests.map((m) => m.runtime?.hookVersion ?? 1)), latest: HOOK_VERSION };
   }
   return null;
+}
+
+/** 背景圖需要 App 已套用 v2 以上的主行程掛鉤（CLI 用的文字說明） */
+export function hookHint(home: string): string | null {
+  const info = hookHintInfo(home);
+  if (!info) return null;
+  if (info.code === 'not-applied') {
+    return '尚未對 App 套用中文化。背景圖由 App 主行程掛鉤載入，請執行：antigravity-i18n apply --lang zh-TW --target app';
+  }
+  if (info.code === 'no-runtime') {
+    return 'App 是以 --no-runtime 套用的，沒有主行程掛鉤，背景圖不會生效。請執行：antigravity-i18n apply --lang <語系> --target app --force';
+  }
+  // old-hook
+  const v = info.current;
+  const missing =
+    v < 2
+      ? '不支援背景圖'
+      : v < 3
+        ? '不支援內建預設（bg preset）、遮罩（--tint）與介面內背景面板（Ctrl+Alt+B）'
+        : '沒有介面內背景面板（Ctrl+Alt+B）';
+  return `App 的主行程掛鉤為舊版（v${v}，目前為 v${info.latest}），${missing}。請重新套用一次：antigravity-i18n apply --lang <語系> --target app --force`;
 }
 
 function printWrite(r: WriteResult): void {

@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { RequestError, collectStatus, runApply, runBg, runRestore, runRules, toFriendly, type ActionContext } from './actions.js';
+import { RequestError, collectStatus, runApply, runBg, runBgUpload, runRestore, runRules, toFriendly, type ActionContext } from './actions.js';
+import { MAX_IMAGE_BYTES } from '../core/background.js';
 import { renderUiHtml } from './html.js';
 import { HOOK_VERSION } from '../core/runtime.js';
 
@@ -62,32 +63,51 @@ function tokenMatches(given: string | string[] | undefined, token: string): bool
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+/** 超過上限的請求：回應 413 後關閉連線（不再讀取剩餘內容） */
+class TooLargeError extends RequestError {
+  constructor(message: string) {
+    super(message, 413);
+  }
+}
+
+function readRaw(req: http.IncomingMessage, limit: number, tooLarge: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    const declared = Number(req.headers['content-length']);
+    if (Number.isFinite(declared) && declared > limit) {
+      reject(new TooLargeError(tooLarge));
+      return;
+    }
     let size = 0;
+    let done = false;
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => {
+      if (done) return;
       size += c.length;
-      if (size > MAX_BODY) {
-        reject(new RequestError('請求內容過大', 413));
-        req.destroy();
+      if (size > limit) {
+        done = true;
+        reject(new TooLargeError(tooLarge));
         return;
       }
       chunks.push(c);
     });
     req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8').trim();
-      if (!raw) return resolve({});
-      try {
-        const v = JSON.parse(raw) as unknown;
-        if (!v || typeof v !== 'object' || Array.isArray(v)) return reject(new RequestError('請求內容必須是 JSON 物件'));
-        resolve(v as Record<string, unknown>);
-      } catch {
-        reject(new RequestError('請求內容不是合法的 JSON'));
-      }
+      if (!done) resolve(Buffer.concat(chunks));
     });
     req.on('error', reject);
   });
+}
+
+async function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  const raw = (await readRaw(req, MAX_BODY, '請求內容過大')).toString('utf8').trim();
+  if (!raw) return {};
+  let v: unknown;
+  try {
+    v = JSON.parse(raw) as unknown;
+  } catch {
+    throw new RequestError('請求內容不是合法的 JSON');
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new RequestError('請求內容必須是 JSON 物件');
+  return v as Record<string, unknown>;
 }
 
 export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
@@ -169,6 +189,11 @@ export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
         }
         case 'POST /api/bg':
           return reply(200, runBg(ctx, await readJson(req)));
+        case 'POST /api/bg/upload': {
+          // 原始圖片位元組（不是 JSON）；參數放在 query string
+          const data = await readRaw(req, MAX_IMAGE_BYTES, '圖片超過 10 MB，請選擇較小的圖片');
+          return reply(200, runBgUpload(ctx, data, url.searchParams));
+        }
         case 'POST /api/rules':
           return reply(200, runRules(ctx, await readJson(req)));
         case 'POST /api/shutdown':
@@ -179,6 +204,12 @@ export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
           return reply(404, { ok: false, error: '找不到' });
       }
     } catch (e) {
+      if (e instanceof TooLargeError) {
+        // 不再讀取剩餘的上傳內容：回應後直接關閉連線
+        send(res, 413, { ok: false, error: e.message }, { Connection: 'close' });
+        res.on('finish', () => req.destroy());
+        return;
+      }
       if (e instanceof RequestError) return reply(e.status, { ok: false, error: e.message });
       return reply(500, { ok: false, error: toFriendly(e).message, detail: toFriendly(e) });
     }

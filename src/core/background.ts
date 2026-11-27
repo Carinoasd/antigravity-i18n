@@ -309,6 +309,8 @@ export interface SetBackgroundOptions {
   cwd?: string;
   /** 測試用：注入 WSL 狀態；未提供時自動偵測 */
   wsl?: WslContext | null;
+  /** 已知的 Windows 路徑（例如上傳時已複製到 Windows 家目錄），優先於自動換算 */
+  windowsPath?: string;
   now?: Date;
 }
 
@@ -331,7 +333,9 @@ export function setBackground(home: string, imagePath: string, opts: SetBackgrou
   };
   const wsl = opts.wsl !== undefined ? opts.wsl : detectWslContext();
   const extra: string[] = [];
-  if (wsl) {
+  if (wsl && opts.windowsPath) {
+    cfg.windowsPath = opts.windowsPath;
+  } else if (wsl) {
     const win = wslToWindowsPath(img.absPath, wsl.distro);
     if (win) cfg.windowsPath = win;
     if (!img.absPath.startsWith('/mnt/')) {
@@ -341,6 +345,76 @@ export function setBackground(home: string, imagePath: string, opts: SetBackgrou
   const r = writeWithMirror(home, cfg, wsl);
   r.warnings.unshift(...extra);
   return r;
+}
+
+// ── 上傳圖片（圖形控制台的「選擇電腦圖片…」） ──────────────
+
+/** 上傳的圖片存成 `${toolHome}/wallpaper.<ext>` */
+export const UPLOAD_BASENAME = 'wallpaper';
+
+/** 以檔案開頭的魔術位元組判斷圖片格式（不信任副檔名或 Content-Type） */
+export function sniffImage(data: Buffer): { ext: string; mime: string } | null {
+  if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { ext: 'png', mime: 'image/png' };
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return { ext: 'jpg', mime: 'image/jpeg' };
+  if (data.length >= 6 && /^GIF8[79]a$/.test(data.subarray(0, 6).toString('latin1'))) return { ext: 'gif', mime: 'image/gif' };
+  if (data.length >= 12 && data.subarray(0, 4).toString('latin1') === 'RIFF' && data.subarray(8, 12).toString('latin1') === 'WEBP') {
+    return { ext: 'webp', mime: 'image/webp' };
+  }
+  return null;
+}
+
+function removeOldUploads(dir: string): void {
+  for (const ext of ['png', 'jpg', 'jpeg', 'gif', 'webp']) fs.rmSync(path.join(dir, `${UPLOAD_BASENAME}.${ext}`), { force: true });
+}
+
+export interface UploadResult extends WriteResult {
+  imagePath: string;
+  /** WSL 中複製到 Windows 家目錄的圖片 */
+  mirrorImage?: string;
+}
+
+/**
+ * 儲存上傳的圖片並設為背景。
+ * WSL 中會把圖片一併複製到 Windows 家目錄，設定檔記錄那一份的 Windows 路徑，
+ * 讓 Windows 版 Antigravity 不必依賴 WSL 檔案系統（\\wsl.localhost）就能讀取。
+ */
+export function saveUploadedImage(home: string, data: Buffer, opts: SetBackgroundOptions = {}): UploadResult {
+  if (data.length === 0) throw new BackgroundError('沒有收到圖片內容');
+  if (data.length > MAX_IMAGE_BYTES) {
+    throw new BackgroundError(`圖片大小 ${(data.length / 1024 / 1024).toFixed(1)} MB 超過上限 10 MB`);
+  }
+  const kind = sniffImage(data);
+  if (!kind) throw new BackgroundError('只支援 PNG、JPEG、WebP、GIF 圖片');
+  // 先驗證其餘參數，避免寫了圖片才發現參數錯誤
+  parseOpacity(opts.opacity);
+  parseBlur(opts.blur);
+  parseSize(opts.size);
+  parsePosition(opts.position);
+  parseMode(opts.mode);
+  parseTint(opts.tint);
+
+  fs.mkdirSync(home, { recursive: true });
+  removeOldUploads(home);
+  const imagePath = path.join(home, `${UPLOAD_BASENAME}.${kind.ext}`);
+  fs.writeFileSync(imagePath, data);
+
+  const wsl = opts.wsl !== undefined ? opts.wsl : detectWslContext();
+  const mh = mirrorHome(wsl, home);
+  let mirrorImage: string | undefined;
+  let windowsPath: string | undefined;
+  if (mh) {
+    try {
+      fs.mkdirSync(mh, { recursive: true });
+      removeOldUploads(mh);
+      mirrorImage = path.join(mh, `${UPLOAD_BASENAME}.${kind.ext}`);
+      fs.writeFileSync(mirrorImage, data);
+      windowsPath = wslToWindowsPath(mirrorImage, wsl?.distro) ?? undefined;
+    } catch {
+      mirrorImage = undefined;
+    }
+  }
+  const r = setBackground(home, imagePath, { ...opts, wsl, windowsPath });
+  return { ...r, imagePath, mirrorImage };
 }
 
 export interface SetPresetOptions {

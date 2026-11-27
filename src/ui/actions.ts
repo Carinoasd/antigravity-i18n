@@ -1,5 +1,5 @@
 import { detectTarget } from '../config/paths.js';
-import { hookHint } from '../commands/bg.js';
+import { hookHint, hookHintInfo, type HookHintInfo } from '../commands/bg.js';
 import type { AsarArchiver } from '../core/asar.js';
 import { listManifests, manifestPathFor } from '../core/backup.js';
 import {
@@ -8,6 +8,7 @@ import {
   clearBackground,
   setBackground,
   setBackgroundEnabled,
+  saveUploadedImage,
   setPreset,
   type BackgroundStatus,
   type WslContext,
@@ -121,8 +122,10 @@ export interface StatusReport {
   background: (BackgroundStatus & { error?: undefined }) | { error: string };
   rules: RulesFileStatus[];
   presets: { name: string; label: string; description: string; image: string }[];
-  /** 背景圖 / 面板需要更新掛鉤時的提示 */
+  /** 背景圖 / 面板需要更新掛鉤時的提示（CLI 用的繁中文字） */
   hint: string | null;
+  /** 同上，結構化版本：控制台依介面語系顯示 */
+  hintInfo: HookHintInfo | null;
 }
 
 export async function collectStatus(ctx: ActionContext, rawPaths: unknown = {}): Promise<StatusReport> {
@@ -166,6 +169,7 @@ export async function collectStatus(ctx: ActionContext, rawPaths: unknown = {}):
     rules: rulesStatus(ctx.userHome),
     presets: Object.entries(BACKGROUND_PRESETS).map(([name, p]) => ({ name, label: p.label, description: p.description, image: p.image })),
     hint: hookHint(ctx.toolHome),
+    hintInfo: hookHintInfo(ctx.toolHome),
   };
 }
 
@@ -319,6 +323,30 @@ export function runBg(ctx: ActionContext, body: Record<string, unknown>): { ok: 
       default:
         throw new RequestError('action 必須是 preset、set、on、off 或 clear');
     }
+  } catch (e) {
+    if (e instanceof BackgroundError) throw new RequestError(e.message);
+    throw e;
+  }
+}
+
+/** 控制台「選擇電腦圖片…」：儲存上傳的圖片並設為背景 */
+export function runBgUpload(
+  ctx: ActionContext,
+  data: Buffer,
+  params: URLSearchParams,
+): { ok: true; action: 'upload'; config: unknown; file: string; mirror?: string; imagePath: string; mirrorImage?: string; warnings: string[] } {
+  const p = (k: string): string | undefined => params.get(k) ?? undefined;
+  try {
+    const r = saveUploadedImage(ctx.toolHome, data, {
+      opacity: p('opacity'),
+      blur: p('blur'),
+      tint: p('tint'),
+      mode: p('mode'),
+      size: p('size'),
+      position: p('position'),
+      wsl: ctx.wsl,
+    });
+    return { ok: true, action: 'upload', config: r.config, file: r.file, mirror: r.mirror, imagePath: r.imagePath, mirrorImage: r.mirrorImage, warnings: r.warnings };
   } catch (e) {
     if (e instanceof BackgroundError) throw new RequestError(e.message);
     throw e;

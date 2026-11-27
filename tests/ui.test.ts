@@ -11,6 +11,9 @@ import { CliError, langLabel, parseApplyLang } from '../src/commands/common.js';
 import { statusCommand } from '../src/commands/status.js';
 import { openBrowser, parsePort, shouldLaunchUi } from '../src/commands/ui.js';
 import { detectTarget } from '../src/config/paths.js';
+import { wslToWindowsPath } from '../src/core/background.js';
+import { TERMINOLOGY_RULES } from '../src/core/locales.js';
+import { UI_TEXT } from '../src/ui/html.js';
 import { electronAsarArchiver } from '../src/core/asar.js';
 import { atomicCopy, atomicWrite, readManifest } from '../src/core/backup.js';
 import { FileLockError, explainFsError, formatFsError, toFriendlyError } from '../src/core/errors.js';
@@ -215,12 +218,13 @@ interface Res {
 
 function request(srv: UiServer, opts: { method?: string; path?: string; headers?: Record<string, string>; body?: unknown; token?: string | null; host?: string }): Promise<Res> {
   return new Promise((resolve, reject) => {
-    const data = opts.body === undefined ? undefined : typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
+    const data: Buffer | string | undefined =
+      opts.body === undefined ? undefined : Buffer.isBuffer(opts.body) || typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
     const headers: Record<string, string> = { Host: opts.host ?? `${UI_HOST}:${srv.port}`, ...(opts.headers ?? {}) };
     if (opts.token !== null) headers['X-AGI18N-Token'] = opts.token ?? srv.token;
     if (data !== undefined) {
       // 一律帶 Content-Length：沒有長度資訊的 body 會被 server 當成下一個請求的開頭（格式錯誤）
-      headers['Content-Type'] = 'application/json';
+      headers['Content-Type'] ??= 'application/json';
       headers['Content-Length'] = String(Buffer.byteLength(data));
     }
     // agent: false：每個請求使用獨立連線，測試之間不共用 keep-alive socket
@@ -320,6 +324,15 @@ describe('本機 HTTP server', () => {
   it('跨站 Origin 回傳 403；同源 Origin 可通過', async () => {
     expect((await request(srv, { path: '/api/status', headers: { Origin: 'https://evil.example' } })).status).toBe(403);
     expect((await request(srv, { path: '/api/status', headers: { Origin: `http://127.0.0.1:${srv.port}` } })).status).toBe(200);
+  });
+
+  it('背景卡片：說明文字在路徑輸入框上方，並有「選擇電腦圖片」按鈕', async () => {
+    const html = (await request(srv, { token: null })).text;
+    const note = html.indexOf('data-i18n="bg.image"');
+    expect(note).toBeGreaterThan(0);
+    expect(note).toBeLessThan(html.indexOf('id="bg-path"'));
+    expect(html).toContain('id="bg-pick"');
+    expect(html).toContain('<input type="file" id="bg-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>');
   });
 
   it('不回應 CORS，且未知路徑回傳 404', async () => {
@@ -444,11 +457,102 @@ describe('本機 HTTP server', () => {
     expect(fs.existsSync(manifests) ? fs.readdirSync(manifests) : []).toEqual([]);
   });
 
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]);
+
+  function upload(body: Buffer, opts: { token?: string | null; query?: string; type?: string } = {}): Promise<Res> {
+    return request(srv, {
+      method: 'POST',
+      path: `/api/bg/upload${opts.query ? `?${opts.query}` : ''}`,
+      token: opts.token,
+      body,
+      headers: { 'Content-Type': opts.type ?? 'image/png' },
+    }).catch((e: Error) => ({ status: -1, headers: {}, text: e.message, json: {} }));
+  }
+
+  it('POST /api/bg/upload：儲存為 wallpaper.<ext> 並設為背景', async () => {
+    const r = await upload(PNG, { query: 'opacity=0.3&blur=4&tint=rgba(0%2C0%2C0%2C0.25)&mode=underlay' });
+    expect(r.status).toBe(200);
+    const saved = path.join(home, 'wallpaper.png');
+    expect(r.json).toMatchObject({ ok: true, action: 'upload', imagePath: saved });
+    expect(fs.readFileSync(saved)).toEqual(PNG);
+    const cfg = JSON.parse(fs.readFileSync(path.join(home, 'background.json'), 'utf8'));
+    expect(cfg).toMatchObject({ kind: 'image', imagePath: saved, opacity: 0.3, blur: 4, tint: 'rgba(0,0,0,0.25)', mode: 'underlay' });
+
+    // 換成 JPEG：舊的 wallpaper.png 被移除
+    const j = await upload(JPEG, { type: 'image/jpeg' });
+    expect(j.json.imagePath).toBe(path.join(home, 'wallpaper.jpg'));
+    expect(fs.existsSync(saved)).toBe(false);
+  });
+
+  it('POST /api/bg/upload：以檔案內容判斷格式，不信任 Content-Type', async () => {
+    const fake = await upload(Buffer.from('<svg onload=alert(1)>'), { type: 'image/png' });
+    expect(fake.status).toBe(400);
+    expect(fake.json.error).toContain('只支援 PNG、JPEG、WebP、GIF');
+    expect((await upload(Buffer.alloc(0))).status).toBe(400);
+    expect(fs.existsSync(path.join(home, 'background.json'))).toBe(false);
+    const badParam = await upload(PNG, { query: 'tint=red%3B%7D' });
+    expect(badParam.status).toBe(400);
+    expect(fs.existsSync(path.join(home, 'wallpaper.png'))).toBe(false);
+  });
+
+  it('POST /api/bg/upload：超過 10 MB 回傳 413；缺少或錯誤 Token 回傳 403', async () => {
+    const big = Buffer.concat([PNG, Buffer.alloc(10 * 1024 * 1024)]);
+    const r = await upload(big);
+    expect(r.status).toBe(413);
+    expect(r.json.error).toContain('10 MB');
+    expect(fs.existsSync(path.join(home, 'wallpaper.png'))).toBe(false);
+    expect((await upload(PNG, { token: null })).status).toBe(403);
+    expect((await upload(PNG, { token: 'f'.repeat(64) })).status).toBe(403);
+    // 之後仍可正常服務
+    expect((await request(srv, { path: '/api/status' })).status).toBe(200);
+  });
+
+  it('GET /api/status：以結構化的 hintInfo 提示掛鉤狀態（控制台依語系顯示）', async () => {
+    const { root } = await makeApp();
+    const s1 = await request(srv, { path: `/api/status?app=${encodeURIComponent(root)}` });
+    expect(s1.json.hintInfo).toEqual({ code: 'not-applied' });
+    await request(srv, { method: 'POST', path: '/api/apply', body: { lang: 'none', paths: { app: root } } });
+    const s2 = await request(srv, { path: `/api/status?app=${encodeURIComponent(root)}` });
+    expect(s2.json.hintInfo).toBeNull();
+    // 舊版掛鉤
+    const mf = path.join(home, 'manifests', fs.readdirSync(path.join(home, 'manifests'))[0]!);
+    const m = JSON.parse(fs.readFileSync(mf, 'utf8'));
+    m.runtime.hookVersion = 3;
+    fs.writeFileSync(mf, JSON.stringify(m));
+    const s3 = await request(srv, { path: `/api/status?app=${encodeURIComponent(root)}` });
+    expect(s3.json.hintInfo).toEqual({ code: 'old-hook', current: 3, latest: HOOK_VERSION });
+  });
+
   it('POST /api/shutdown：回應後關閉 server', async () => {
     const r = await request(srv, { method: 'POST', path: '/api/shutdown' });
     expect(r.json).toMatchObject({ ok: true });
     await srv.closed;
     expect(srv.server.listening).toBe(false);
+  });
+});
+
+describe('本機 HTTP server：WSL 上傳鏡像', () => {
+  it('圖片一併複製到 Windows 家目錄，設定記錄那一份的 Windows 路徑', async () => {
+    const winHome = path.join(dir, 'winhome');
+    const srv = await startUiServer({ toolHome: home, userHome, toolVersion: '0', detect: () => null, wsl: { distro: 'Ubuntu', windowsHome: winHome } });
+    try {
+      const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9]);
+      const r = await request(srv, { method: 'POST', path: '/api/bg/upload', body: png, headers: { 'Content-Type': 'image/png' } });
+      expect(r.status).toBe(200);
+      const mirrorImage = path.join(winHome, '.antigravity-i18n', 'wallpaper.png');
+      expect(r.json.mirrorImage).toBe(mirrorImage);
+      expect(fs.readFileSync(mirrorImage)).toEqual(png);
+      const cfg = JSON.parse(fs.readFileSync(path.join(winHome, '.antigravity-i18n', 'background.json'), 'utf8'));
+      // 真實 WSL 中鏡像位於 /mnt/c/... → C:\...；測試的暫存路徑則換算成 UNC（Windows runner 上無法換算）
+      const expected = wslToWindowsPath(mirrorImage, 'Ubuntu');
+      if (expected) expect(cfg.windowsPath).toBe(expected);
+      else expect(cfg.windowsPath).toBeUndefined();
+      // 已複製到 Windows 側，不需要再提醒「圖片位於 WSL 檔案系統」
+      expect((r.json.warnings as string[]).some((w) => w.includes('WSL 檔案系統'))).toBe(false);
+    } finally {
+      await srv.close();
+    }
   });
 });
 
@@ -548,20 +652,60 @@ describe('ui 指令與無參數啟動', () => {
       return { on: () => undefined, unref: () => undefined };
     };
     const url = 'http://127.0.0.1:1234/';
-    expect(openBrowser(url, 'win32', {}, spawner)).toBe(true);
-    expect(openBrowser(url, 'darwin', {}, spawner)).toBe(true);
-    expect(openBrowser(url, 'linux', {}, spawner)).toBe(true);
-    expect(openBrowser(url, 'linux', { WSL_DISTRO_NAME: 'Ubuntu' }, spawner)).toBe(true);
+    // wsl 一律明確指定：在真實 WSL 環境中自動偵測會讀到 /proc/version
+    expect(openBrowser(url, { platform: 'win32', wsl: false, spawner })).toBe(true);
+    expect(openBrowser(url, { platform: 'darwin', wsl: false, spawner })).toBe(true);
+    expect(openBrowser(url, { platform: 'linux', wsl: false, spawner })).toBe(true);
+    expect(openBrowser(url, { platform: 'linux', wsl: true, spawner })).toBe(true);
     expect(calls).toEqual([
       ['cmd', ['/c', 'start', '', url]],
       ['open', [url]],
       ['xdg-open', [url]],
       ['cmd.exe', ['/c', 'start', '', url]],
     ]);
-    expect(
-      openBrowser(url, 'linux', {}, () => {
-        throw new Error('ENOENT');
-      }),
-    ).toBe(false);
+    const fail = (): never => {
+      throw new Error('ENOENT');
+    };
+    expect(openBrowser(url, { platform: 'linux', wsl: false, spawner: fail })).toBe(false);
+  });
+
+  it('openBrowser：wsl 只影響 Linux（macOS / Windows 不受影響）', () => {
+    const calls: string[] = [];
+    const spawner = (cmd: string) => {
+      calls.push(cmd);
+      return { on: () => undefined, unref: () => undefined };
+    };
+    openBrowser('http://127.0.0.1:1/', { platform: 'darwin', wsl: true, spawner });
+    openBrowser('http://127.0.0.1:1/', { platform: 'win32', wsl: true, spawner });
+    expect(calls).toEqual(['open', 'cmd']);
+  });
+});
+
+describe('控制台介面文字', () => {
+  it('繁中 / 简中 / EN 的 key 完全一致', () => {
+    const tw = Object.keys(UI_TEXT['zh-TW']).sort();
+    expect(Object.keys(UI_TEXT['zh-CN']).sort()).toEqual(tw);
+    expect(Object.keys(UI_TEXT.en).sort()).toEqual(tw);
+    for (const code of ['not-applied', 'no-runtime', 'old-hook']) expect(tw).toContain(`hint.${code}`);
+  });
+
+  it('遵守繁簡用語規範（與 validate 相同的規則）', () => {
+    const problems: string[] = [];
+    for (const lang of ['zh-TW', 'zh-CN'] as const) {
+      for (const [k, v] of Object.entries(UI_TEXT[lang])) {
+        for (const rule of TERMINOLOGY_RULES[lang]) if (rule.pattern.test(v)) problems.push(`${lang} ${k}: ${v}（${rule.hint}）`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('提示文字引導點擊介面按鈕，而不是要求輸入指令', () => {
+    for (const lang of ['zh-TW', 'zh-CN', 'en'] as const) {
+      for (const code of ['not-applied', 'no-runtime', 'old-hook']) {
+        const text = UI_TEXT[lang][`hint.${code}`]!;
+        expect(text).not.toMatch(/antigravity-i18n |--force|--lang/);
+      }
+    }
+    expect(UI_TEXT.en['hint.old-hook']).toContain('{current}');
   });
 });
