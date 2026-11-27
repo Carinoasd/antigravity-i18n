@@ -54,6 +54,14 @@ npm run smoke:sea -- dist-sea/antigravity-i18n-<平台>-<架構>
   - `src/runtime/background.ts`：背景圖的主行程讀取函式與 renderer 注入函式。
   - `src/runtime/panel.ts`：介面內背景設定面板（`Ctrl + Alt + B` / macOS `Cmd + Option + B`）。
     掛鉤組合腳本時把 `applyBackground` 以參數傳入（不可直接引用）；設定存於 IndexedDB `antigravity-i18n`。
+    「掃描未翻譯英文」的保護區清單（`PROTECTED`）必須與 `overlay.ts` 逐字相同（測試會比對），且絕不讀取表單欄位內容。
+  - `src/core/launcher.ts`：智慧啟動器（`launch`）。**不可**加入任何常駐監控或 daemon：只在啟動當下檢查一次。
+    啟動指令以純函式 `launchCommandFor` 產生、`spawn` 可注入；`FileLockError` 只提示並略過重新套用，不可中斷啟動。
+    雜湊快取存於工具資料目錄的 `launch-state.json`（只影響速度，損毀時重新計算）。
+  - `src/core/shortcut.ts`：跨平台桌面捷徑（`shortcut`）。PowerShell 腳本必須是固定字串（`-EncodedCommand`），
+    使用者提供的路徑、名稱與參數**一律透過環境變數**傳入（WSL 另外列進 `WSLENV`），不可拼接進 PowerShell 程式碼；
+    `.command` / `.desktop` 的參數分別以 POSIX 與 freedesktop 規則加引號，並拒絕換行與控制字元。
+    捷徑帶有標記，移除與覆蓋時只處理本工具建立的檔案（除非 `--force`）。測試一律注入暫存目錄與假的 runner / spawn。
 - **`src/runtime/` 的特殊規則**：這裡的函式會被 `toString()` 序列化，內嵌進主行程掛鉤或注入頁面，因此
   - 必須完全自足：不可引用模組層級變數、import 或其他函式
   - 零依賴，只用瀏覽器內建 API
@@ -69,7 +77,7 @@ npm run smoke:sea -- dist-sea/antigravity-i18n-<平台>-<架構>
 - `src/ui/`：本機圖形控制台（`antigravity-i18n` 不帶參數或 `antigravity-i18n ui`）。**只能使用 Node 內建模組**（`node:http`、`node:crypto`），不可新增執行期相依套件。
   - `server.ts`：只監聽 `127.0.0.1`；**所有**請求檢查 `Host` 必須是 `127.0.0.1:<port>`（含首頁，防 DNS rebinding）；**所有** `/api/*` 必須帶正確的 `X-AGI18N-Token`（timingSafeEqual）；有 `Origin` 時必須同源；不回應任何 CORS header。放寬任何一項都不可接受。
   - `actions.ts`：把 CLI 功能包成回傳結構化結果的函式（不印出），偵測函式可注入。
-  - `html.ts`：單一自足 HTML，腳本帶 CSP nonce；動態資料一律以 `textContent` 寫入，不可用 `innerHTML`。介面文字放在 `UI_TEXT`（zh-TW / zh-CN / en），同樣遵守繁簡用語規範。
+  - `html.ts`：單一自足 HTML，腳本帶 CSP nonce；動態資料一律以 `textContent` 寫入，不可用 `innerHTML`。介面文字放在 `UI_TEXT`（zh-TW / zh-CN / ja / ko / en，五語 key 必須一致），同樣遵守繁簡用語規範。
   - 測試 server 時一律注入只認自訂路徑的 `detect`，並把 `toolHome` / `userHome` 指向暫存目錄。
 - **單檔執行檔（Node.js SEA）**：`npm run build:sea`（`scripts/build-sea.mjs`）以 esbuild 打包成 CJS 並用 postject 注入 Node 22 執行檔，產出 `dist-sea/antigravity-i18n-<win|macos|linux>-<arch>[.exe]`；`npm run smoke:sea -- <執行檔>`（`scripts/smoke-sea.mjs`）跑冒煙測試。
   - **不可開啟 esbuild 的 `keepNames`**：它會在函式內插入 `__name()` helper，讓 `src/runtime/` 序列化的注入腳本不再自足。冒煙測試會實際套用假的 app.asar、在模擬的 Electron 與 jsdom 中執行注入腳本，並檢查沒有 esbuild helper。
@@ -141,11 +149,11 @@ scripts/smoke-sea.mjs      單檔執行檔冒煙測試（Release 與 PR CI 共�
 .github/workflows/         ci.yml（PR）、sea.yml（三平台打包，可重用）、release.yml（v* tag 發布）
 src/types.ts               共用型別、語系／目標／模組常數
 src/config/paths.ts        各平台（含 WSL）安裝路徑偵測
-src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules / errors
+src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules / errors / launcher / shortcut
 src/runtime/overlay.ts     renderer 端 DOM 翻譯 runtime
 src/runtime/background.ts  背景圖：主行程讀取 + renderer 注入
 src/runtime/panel.ts       介面內背景設定面板（Ctrl+Alt+B）
-src/commands/              status / apply / restore / rules / bg / ui / validate
+src/commands/              status / apply / restore / rules / bg / launch / shortcut / ui / validate
 src/ui/                    本機圖形控制台：server / actions / html（零相依套件）
 locales/                   zh-TW、zh-CN 各 7 個模組 + protected-terms.json
 tests/                     vitest 單元測試（runtime 測試使用 jsdom，面板持久化測試使用 fake-indexeddb）

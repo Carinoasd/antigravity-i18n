@@ -75,7 +75,9 @@ export function hookHint(home: string): string | null {
       ? '不支援背景圖'
       : v < 3
         ? '不支援內建預設（bg preset）、遮罩（--tint）與介面內背景面板（Ctrl+Alt+B）'
-        : '沒有介面內背景面板（Ctrl+Alt+B）';
+        : v < 4
+          ? '沒有介面內背景面板（Ctrl+Alt+B）'
+          : '介面面板（Ctrl+Alt+B）沒有「掃描未翻譯英文」工具';
   return `App 的主行程掛鉤為舊版（v${v}，目前為 v${info.latest}），${missing}。請重新套用一次：antigravity-i18n apply --lang <語系> --target app --force`;
 }
 

@@ -105,6 +105,21 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'ja' | 'ko' | 'en', Record<stri
     'preset.sunset': '霓虹夕陽',
     'preset.midnight': '深夜藍',
     'preset.forest': '靜謐森林',
+    'sc.title': '桌面捷徑（智慧啟動器）',
+    'sc.desc': '從這個捷徑開啟 Antigravity：若官方剛自動更新、覆蓋了在地化，會先自動重新套用再啟動。不常駐任何背景程式（0 MB 記憶體）。',
+    'sc.name': '名稱',
+    'sc.lang': '語系',
+    'sc.lang.auto': '沿用上次套用的語系',
+    'sc.lang.none': '僅背景模式（維持英文）',
+    'sc.install': '建立桌面捷徑',
+    'sc.remove': '移除桌面捷徑',
+    'sc.state.none': '捷徑：未建立',
+    'sc.state.ok': '捷徑：已建立',
+    'sc.state.foreign': '捷徑：同名檔案已存在（非本工具建立）',
+    'sc.kind.windows-lnk': 'Windows 桌面捷徑（.lnk）',
+    'sc.kind.wsl-lnk': 'Windows 桌面捷徑（透過 WSL 執行）',
+    'sc.kind.macos-command': 'macOS 桌面腳本（.command）',
+    'sc.kind.linux-desktop': 'Linux 應用程式選單（.desktop）',
   },
   'zh-CN': {
     title: 'Antigravity 多语言控制台',
@@ -193,6 +208,21 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'ja' | 'ko' | 'en', Record<stri
     'preset.sunset': '霓虹夕阳',
     'preset.midnight': '深夜蓝',
     'preset.forest': '静谧森林',
+    'sc.title': '桌面快捷方式（智能启动器）',
+    'sc.desc': '从这个快捷方式打开 Antigravity：如果官方刚自动更新、覆盖了本地化，会先自动重新应用再启动。不常驻任何后台程序（0 MB 内存）。',
+    'sc.name': '名称',
+    'sc.lang': '语言',
+    'sc.lang.auto': '沿用上次应用的语言',
+    'sc.lang.none': '仅背景模式（保持英文）',
+    'sc.install': '创建桌面快捷方式',
+    'sc.remove': '移除桌面快捷方式',
+    'sc.state.none': '快捷方式：未创建',
+    'sc.state.ok': '快捷方式：已创建',
+    'sc.state.foreign': '快捷方式：同名文件已存在（非本工具创建）',
+    'sc.kind.windows-lnk': 'Windows 桌面快捷方式（.lnk）',
+    'sc.kind.wsl-lnk': 'Windows 桌面快捷方式（通过 WSL 运行）',
+    'sc.kind.macos-command': 'macOS 桌面脚本（.command）',
+    'sc.kind.linux-desktop': 'Linux 应用程序菜单（.desktop）',
   },
   ja: {
     title: 'Antigravity 多言語コントロールパネル',
@@ -281,6 +311,21 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'ja' | 'ko' | 'en', Record<stri
     'preset.sunset': 'ネオン夕焼け',
     'preset.midnight': 'ミッドナイト',
     'preset.forest': '静寂の森',
+    'sc.title': 'デスクトップショートカット（スマートランチャー）',
+    'sc.desc': 'このショートカットから Antigravity を開くと、公式の自動アップデートでローカライズが上書きされていた場合に自動で再適用してから起動します。常駐プログラムはありません（メモリ使用 0 MB）。',
+    'sc.name': '名前',
+    'sc.lang': '言語',
+    'sc.lang.auto': '前回適用した言語を使用',
+    'sc.lang.none': '背景のみ（英語のまま）',
+    'sc.install': 'デスクトップショートカットを作成',
+    'sc.remove': 'デスクトップショートカットを削除',
+    'sc.state.none': 'ショートカット：未作成',
+    'sc.state.ok': 'ショートカット：作成済み',
+    'sc.state.foreign': 'ショートカット：同名のファイルが既に存在します（このツール以外で作成）',
+    'sc.kind.windows-lnk': 'Windows デスクトップショートカット（.lnk）',
+    'sc.kind.wsl-lnk': 'Windows デスクトップショートカット（WSL 経由で実行）',
+    'sc.kind.macos-command': 'macOS デスクトップスクリプト（.command）',
+    'sc.kind.linux-desktop': 'Linux アプリケーションメニュー（.desktop）',
   },
   ko: {
     title: 'Antigravity 다국어 제어판',
@@ -369,6 +414,21 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'ja' | 'ko' | 'en', Record<stri
     'preset.sunset': '네온 석양',
     'preset.midnight': '미드나잇',
     'preset.forest': '고요한 숲',
+    'sc.title': '바탕 화면 바로 가기 (스마트 런처)',
+    'sc.desc': '이 바로 가기로 Antigravity를 열면, 공식 자동 업데이트로 현지화가 덮어써진 경우 자동으로 다시 적용한 뒤 실행합니다. 상주 프로그램은 없습니다 (메모리 0 MB).',
+    'sc.name': '이름',
+    'sc.lang': '언어',
+    'sc.lang.auto': '마지막으로 적용한 언어 사용',
+    'sc.lang.none': '배경만 (영어 유지)',
+    'sc.install': '바탕 화면 바로 가기 만들기',
+    'sc.remove': '바탕 화면 바로 가기 삭제',
+    'sc.state.none': '바로 가기: 만들지 않음',
+    'sc.state.ok': '바로 가기: 만들어짐',
+    'sc.state.foreign': '바로 가기: 같은 이름의 파일이 이미 있음 (이 도구가 만들지 않음)',
+    'sc.kind.windows-lnk': 'Windows 바탕 화면 바로 가기 (.lnk)',
+    'sc.kind.wsl-lnk': 'Windows 바탕 화면 바로 가기 (WSL로 실행)',
+    'sc.kind.macos-command': 'macOS 바탕 화면 스크립트 (.command)',
+    'sc.kind.linux-desktop': 'Linux 애플리케이션 메뉴 (.desktop)',
   },
   en: {
     title: 'Antigravity i18n Control Panel',
@@ -457,6 +517,21 @@ export const UI_TEXT: Record<'zh-TW' | 'zh-CN' | 'ja' | 'ko' | 'en', Record<stri
     'preset.sunset': 'Neon Sunset',
     'preset.midnight': 'Midnight',
     'preset.forest': 'Forest',
+    'sc.title': 'Desktop shortcut (smart launcher)',
+    'sc.desc': 'Open Antigravity from this shortcut: if an official auto-update has overwritten the localization, it is re-applied automatically before launch. Nothing stays running in the background (0 MB memory).',
+    'sc.name': 'Name',
+    'sc.lang': 'Language',
+    'sc.lang.auto': 'Keep the last applied language',
+    'sc.lang.none': 'Background only (keep English)',
+    'sc.install': 'Create desktop shortcut',
+    'sc.remove': 'Remove desktop shortcut',
+    'sc.state.none': 'Shortcut: not created',
+    'sc.state.ok': 'Shortcut: created',
+    'sc.state.foreign': 'Shortcut: a file with the same name already exists (not created by this tool)',
+    'sc.kind.windows-lnk': 'Windows desktop shortcut (.lnk)',
+    'sc.kind.wsl-lnk': 'Windows desktop shortcut (runs through WSL)',
+    'sc.kind.macos-command': 'macOS desktop script (.command)',
+    'sc.kind.linux-desktop': 'Linux application menu (.desktop)',
   },
 };
 
@@ -479,7 +554,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 th{white-space:nowrap}
 td.nowrap{white-space:nowrap}
-td.path{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;word-break:break-all}
+td.path,.note.path{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;word-break:break-all}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.muted{color:var(--muted)}
 button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:7px 12px}
 button:hover{border-color:var(--accent)}
@@ -548,6 +623,7 @@ const SCRIPT = `
     document.querySelectorAll('.langs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang)); });
     document.querySelectorAll('#presets .preset').forEach(function (b) { b.textContent = presetLabel(b.getAttribute('data-preset'), b.getAttribute('data-label')); });
     if (status) renderStatus(status);
+    if (shortcutLast) renderShortcut(shortcutLast);
   }
 
   function paths() {
@@ -630,6 +706,13 @@ const SCRIPT = `
       log(lines, cls);
     });
     if (res.results && res.results.length === 0) log(t('r.nothing'), 'muted');
+    if (res.shortcut) {
+      var sc = res.shortcut;
+      var lines3 = ['shortcut ' + sc.action + (sc.action === 'remove' && !sc.removed ? ' —' : ' ✔') + '  ' + t('sc.kind.' + sc.kind), sc.file];
+      if (sc.action === 'install') lines3.push(sc.command);
+      (sc.warnings || []).forEach(function (w) { lines3.push('⚠ ' + w); });
+      log(lines3, 'ok');
+    }
     if (res.action) {
       var lines2 = ['bg ' + res.action + ' ✔'];
       if (res.imagePath) lines2.push(res.imagePath);
@@ -707,7 +790,29 @@ const SCRIPT = `
     return api('GET', '/api/status' + (qs ? '?' + qs : '')).then(function (s) {
       if (s.ok === false) { log(s.error || 'status failed', 'bad'); return; }
       renderStatus(s);
-    });
+    }).then(refreshShortcut);
+  }
+
+  function shortcutBody() {
+    return { name: $('sc-name').value.trim(), lang: $('sc-lang').value, paths: { app: $('path-app').value.trim() } };
+  }
+
+  var shortcutLast = null;
+  function renderShortcut(res) {
+    shortcutLast = res;
+    var s = res && res.shortcut;
+    if (!s) {
+      $('sc-state').textContent = (res && res.error) || '';
+      $('sc-file').textContent = '';
+      return;
+    }
+    $('sc-state').textContent = (s.exists ? (s.managed ? t('sc.state.ok') : t('sc.state.foreign')) : t('sc.state.none')) + ' · ' + t('sc.kind.' + s.kind);
+    $('sc-file').textContent = s.file;
+  }
+
+  function refreshShortcut() {
+    var q = 'name=' + encodeURIComponent($('sc-name').value.trim()) + '&app=' + encodeURIComponent($('path-app').value.trim());
+    return api('GET', '/api/shortcut?' + q).then(renderShortcut).catch(function () {});
   }
 
   function applyBody(l) {
@@ -727,6 +832,8 @@ const SCRIPT = `
     'bg-on': function () { return api('POST', '/api/bg', { action: 'on' }); },
     'bg-off': function () { return api('POST', '/api/bg', { action: 'off' }); },
     'bg-clear': function () { return api('POST', '/api/bg', { action: 'clear' }); },
+    'sc-install': function () { return api('POST', '/api/shortcut/install', shortcutBody()); },
+    'sc-remove': function () { return api('POST', '/api/shortcut/remove', shortcutBody()); },
   };
 
   document.querySelectorAll('button[data-act]').forEach(function (b) {
@@ -867,6 +974,21 @@ export function renderUiHtml(opts: UiHtmlOptions): string {
       <button type="button" data-act="bg-off" data-i18n="bg.off"></button>
       <button type="button" class="danger" data-act="bg-clear" data-i18n="bg.clear"></button>
     </div>
+  </section>
+
+  <section class="card wide" id="shortcut-card">
+    <h2 data-i18n="sc.title"></h2>
+    <p class="note" data-i18n="sc.desc"></p>
+    <div class="row">
+      <label class="ctl"><span data-i18n="sc.name"></span><input type="text" id="sc-name" spellcheck="false" maxlength="80" value="Antigravity (i18n)"></label>
+      <label class="ctl"><span data-i18n="sc.lang"></span><select id="sc-lang">${opt('', 'sc.lang.auto')}<option value="zh-TW">繁體中文</option><option value="zh-CN">简体中文</option><option value="ja">日本語</option><option value="ko">한국어</option>${opt('none', 'sc.lang.none')}</select></label>
+    </div>
+    <div class="row">
+      <button type="button" class="primary" data-act="sc-install" data-i18n="sc.install"></button>
+      <button type="button" class="danger" data-act="sc-remove" data-i18n="sc.remove"></button>
+      <span id="sc-state" class="muted"></span>
+    </div>
+    <div id="sc-file" class="note path"></div>
   </section>
 
   <section class="card wide" id="result-card">

@@ -11,8 +11,10 @@ import {
   bgToggleCommand,
 } from './commands/bg.js';
 import { CliError } from './commands/common.js';
+import { launchCommand } from './commands/launch.js';
 import { restoreCommand } from './commands/restore.js';
 import { rulesCommand } from './commands/rules.js';
+import { shortcutCommand } from './commands/shortcut.js';
 import { statusCommand } from './commands/status.js';
 import { launchInteractive, shouldLaunchUi, uiCommand } from './commands/ui.js';
 import { validateCommand } from './commands/validate.js';
@@ -133,6 +135,58 @@ bg.command('status').description('顯示背景圖設定與狀態').action(async 
 bg.command('on').description('啟用背景圖').action(async () => run(() => bgToggleCommand(true)));
 bg.command('off').description('暫時停用背景圖（保留設定）').action(async () => run(() => bgToggleCommand(false)));
 bg.command('clear').description('清除背景圖設定檔').action(async () => run(() => bgClearCommand()));
+
+program
+  .command('launch')
+  .description('智慧啟動 Antigravity App：偵測到官方自動更新覆蓋 app.asar 時先自動重新套用，再啟動並立即結束（不常駐）')
+  .addOption(new Option('-l, --lang <lang>', '重新套用時使用的語系：zh-TW | zh-CN | ja | ko | none（預設沿用上次套用的語系）'))
+  .option('-p, --path <customPath>', '手動指定 App 安裝路徑')
+  .option('--no-reapply', '不檢查、不重新套用，只啟動 Antigravity')
+  .addHelpText(
+    'after',
+    `
+流程：
+  1. 讀取上次套用的 manifest，比對目前 app.asar 的 SHA-256（以檔案大小與修改時間快取，未變更時毫秒級跳過）
+  2. 雜湊不同（官方剛自動更新）或掛鉤為舊版 → 備份新版原始檔後自動重新套用
+     Antigravity 已在執行而鎖住檔案時，只提示並略過本次重新套用，不影響啟動
+  3. 以 detached 方式啟動 Antigravity，本工具立即結束（0 MB 常駐記憶體）
+
+範例：
+  $ antigravity-i18n launch
+  $ antigravity-i18n launch --lang zh-CN
+  $ antigravity-i18n launch --path "/Applications/Antigravity App.app" --no-reapply
+
+建議搭配桌面捷徑使用：antigravity-i18n shortcut install`,
+  )
+  .action(async (opts) => run(() => launchCommand(opts)));
+
+program
+  .command('shortcut')
+  .description('建立／移除指向 launch 的桌面捷徑（Windows .lnk、WSL、macOS .command、Linux .desktop）')
+  .addArgument(new Argument('<action>', 'install | remove | status').choices(['install', 'remove', 'status']))
+  .option('-n, --name <name>', '捷徑顯示名稱', 'Antigravity (i18n)')
+  .addOption(new Option('-l, --lang <lang>', '捷徑啟動時重新套用的語系：zh-TW | zh-CN | ja | ko | none（預設沿用上次套用的語系）'))
+  .option('-p, --path <customPath>', '手動指定 App 安裝路徑（同時傳給 launch）')
+  .option('--dir <dir>', '捷徑所在目錄（預設為桌面；Linux 為 ~/.local/share/applications）')
+  .option('-f, --force', '覆蓋或移除非本工具建立的同名檔案')
+  .addHelpText(
+    'after',
+    `
+範例：
+  $ antigravity-i18n shortcut install
+  $ antigravity-i18n shortcut install --name "Antigravity 中文版" --lang zh-TW
+  $ antigravity-i18n shortcut status
+  $ antigravity-i18n shortcut remove
+
+各平台產物：
+  Windows  桌面 .lnk（Antigravity 圖示、最小化執行避免黑窗閃爍）
+  WSL      Windows 桌面 .lnk，透過 wsl.exe -d <發行版> 執行 launch（需偵測到 Windows 側 Antigravity）
+  macOS    ~/Desktop/<名稱>.command
+  Linux    ~/.local/share/applications/antigravity-i18n.desktop
+
+捷徑只執行一次 launch，不安裝任何常駐程式；移除捷徑即完全移除。`,
+  )
+  .action(async (action: string, opts) => run(() => shortcutCommand(action, opts)));
 
 program
   .command('ui')

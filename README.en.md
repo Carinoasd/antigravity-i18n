@@ -110,6 +110,8 @@ antigravity-i18n rules install --lang zh-TW      # zero-touch: Chinese AI replie
 | `restore [--target ...] [--path <dir>] [--force]` | Verify backup SHA-256 and restore byte-for-byte |
 | `rules <install\|remove\|status> [--lang ...]` | Manage `~/.gemini/config/rules/language-zh-*.md` (`trigger: always_on`) |
 | `bg set <image>` / `bg preset <name>` / `bg presets` / `bg on\|off\|clear\|status` | Custom background (`--opacity`, `--blur`, `--size`, `--position`, `--mode overlay\|underlay`, `--tint`) |
+| `launch [--lang <lang>] [--path <dir>] [--no-reapply]` | Smart launcher: if an official auto-update replaced `app.asar` (SHA-256 changed) or the hook is outdated, re-apply first, then start Antigravity and exit immediately (nothing stays resident, 0 MB). If Antigravity is running and the file is locked, it only prints a hint and skips this re-apply. |
+| `shortcut <install\|remove\|status> [--name <name>] [--lang ...] [--path <dir>] [--dir <dir>]` | Create / remove a desktop shortcut that runs `launch`: Windows `.lnk`, WSL (Windows desktop `.lnk` → `wsl.exe`), macOS `.command`, Linux `.desktop`. Also available in the control panel. |
 | `validate` | Dictionary validator for CI (exit code 0 / 1) |
 
 ## Custom background and the `Ctrl+Alt+B` panel

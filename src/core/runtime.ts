@@ -30,8 +30,9 @@ export const RUNTIME_MARKER = '/* antigravity-i18n:runtime */';
  * - 2：翻譯 runtime + 自訂背景圖
  * - 3：背景圖支援內建漸層預設（bg preset）與可讀性遮罩（--tint）
  * - 4：介面內背景設定面板（Ctrl+Alt+B），設定存於 IndexedDB
+ * - 5：面板新增「掃描未翻譯英文」（複製 JSON、前往 GitHub 回報）
  */
-export const HOOK_VERSION = 4;
+export const HOOK_VERSION = 5;
 
 /** 介面面板選圖的大小上限（與 CLI 相同） */
 export const PANEL_MAX_BYTES = 10 * 1024 * 1024;

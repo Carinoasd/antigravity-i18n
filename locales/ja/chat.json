@@ -83,5 +83,11 @@
   "Retired": "終了済み",
   "Search members": "メンバーを検索",
   "Jump to approvals": "承認待ちへ移動",
-  "No swarm in this conversation": "この会話にスウォームはありません"
+  "No swarm in this conversation": "この会話にスウォームはありません",
+  "No Project": "プロジェクトなし",
+  "Ask anything, @ to mention, / for actions": "何でも質問できます（@ でメンション、/ でアクション）",
+  "Good to see you, {name}. What's next?": "こんにちは、{name} さん。次は何をしますか？",
+  "Build me a web app": "Web アプリを作って",
+  "Add a Gemini feature to my app": "アプリに Gemini の機能を追加して",
+  "Bring over my setup from other Agentic Developer Tools": "他の Agentic 開発ツールから設定を移行して"
 }

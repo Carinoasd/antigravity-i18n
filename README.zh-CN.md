@@ -110,6 +110,8 @@ antigravity-i18n rules install --lang zh-CN      # 零侵入：只让 AI 用中�
 | `restore [--target ...] [--path <目录>] [--force]` | 校验备份 SHA-256 并逐字节还原 |
 | `rules <install\|remove\|status> [--lang ...]` | 管理 `~/.gemini/config/rules/language-zh-*.md`（`trigger: always_on`） |
 | `bg set <图片>` / `bg preset <名称>` / `bg presets` / `bg on\|off\|clear\|status` | 自定义背景（`--opacity`、`--blur`、`--size`、`--position`、`--mode overlay\|underlay`、`--tint`） |
+| `launch [--lang <语言>] [--path <目录>] [--no-reapply]` | 智能启动器：检测到官方自动更新覆盖 `app.asar`（SHA-256 改变）或挂钩为旧版时，先自动重新应用再启动 Antigravity，随即退出（不常驻、0 MB 内存）。Antigravity 正在运行导致文件被锁定时只提示并跳过本次重新应用。 |
+| `shortcut <install\|remove\|status> [--name <名称>] [--lang ...] [--path <目录>] [--dir <目录>]` | 创建／移除指向 `launch` 的桌面快捷方式：Windows `.lnk`、WSL（Windows 桌面 `.lnk` → `wsl.exe`）、macOS `.command`、Linux `.desktop`。图形控制台也可一键创建。 |
 | `validate` | CI 用词库校验（exit code 0 / 1） |
 
 ## 自定义背景与 `Ctrl+Alt+B` 面板

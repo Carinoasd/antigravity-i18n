@@ -83,5 +83,11 @@
   "Retired": "종료됨",
   "Search members": "구성원 검색",
   "Jump to approvals": "승인 대기로 이동",
-  "No swarm in this conversation": "이 대화에 스웜이 없습니다"
+  "No swarm in this conversation": "이 대화에 스웜이 없습니다",
+  "No Project": "프로젝트 없음",
+  "Ask anything, @ to mention, / for actions": "무엇이든 물어보세요 (@로 멘션, /로 작업 실행)",
+  "Good to see you, {name}. What's next?": "{name}님, 반가워요. 다음은 무엇을 할까요?",
+  "Build me a web app": "웹 앱을 만들어 줘",
+  "Add a Gemini feature to my app": "내 앱에 Gemini 기능을 추가해 줘",
+  "Bring over my setup from other Agentic Developer Tools": "다른 Agentic 개발 도구에서 내 설정 가져오기"
 }

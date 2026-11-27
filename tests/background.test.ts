@@ -990,8 +990,11 @@ describe('bg preset / presets 指令與掛鉤升級提示', () => {
       runtime: { entries: 1, mainEntry: 'dist/main.js', runtimeFile: 'dist/x.js', hookVersion: 2 },
     };
     writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), m);
-    expect(HOOK_VERSION).toBe(4);
-    expect(hookHint(home)).toMatch(/v2.*v4.*bg preset.*--tint.*Ctrl\+Alt\+B.*--force/);
+    expect(HOOK_VERSION).toBe(5);
+    expect(hookHint(home)).toMatch(/v2.*v5.*bg preset.*--tint.*Ctrl\+Alt\+B.*--force/);
+    // v4 只缺少「掃描未翻譯英文」工具
+    writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), { ...m, runtime: { ...m.runtime!, hookVersion: 4 } });
+    expect(hookHint(home)).toMatch(/v4.*v5.*掃描未翻譯英文.*--force/);
   });
 });
 

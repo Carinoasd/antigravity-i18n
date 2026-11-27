@@ -401,8 +401,8 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     expect(panels(wc)).toHaveLength(2);
   });
 
-  it('掛鉤 v4 內嵌完整的預設表與背景面板', () => {
-    expect(HOOK_VERSION).toBe(4);
+  it('掛鉤 v5 內嵌完整的預設表與背景面板（含未翻譯掃描）', () => {
+    expect(HOOK_VERSION).toBe(5);
     for (const format of ['cjs', 'esm'] as const) {
       const hook = buildHook(format);
       expect(hook).toContain(`/* antigravity-i18n:hook-version ${HOOK_VERSION} */`);
@@ -411,6 +411,7 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
       expect(hook).toContain('bgCache, __agi18nPresets)');
       expect(hook).toContain('var __agi18nPanel = ');
       expect(hook).toContain('ANTIGRAVITY_I18N_NO_PANEL');
+      expect(hook).toContain('掃描未翻譯英文');
       for (const p of Object.values(BACKGROUND_PRESETS)) expect(hook).toContain(JSON.stringify(p.label));
     }
   });
