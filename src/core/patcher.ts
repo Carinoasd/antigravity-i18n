@@ -17,6 +17,18 @@ import {
   verifyBackup,
   writeManifest,
 } from './backup.js';
+import {
+  RUNTIME_FILE_NAME,
+  buildRuntimeScript,
+  countRuntimeEntries,
+  detectModuleFormat,
+  hasHook,
+  injectHook,
+  parsePackageJson,
+  resolveMainEntry,
+  runtimeEntryPath,
+  type RuntimeLayerInfo,
+} from './runtime.js';
 import { Translator, emptyStats, mergeHits } from './translator.js';
 
 /** asar 內會被翻譯的副檔名 */
@@ -32,6 +44,8 @@ export interface PatchContext {
   archiver?: AsarArchiver;
   toolVersion?: string;
   now?: Date;
+  /** asar 目標是否啟用執行期 DOM 注入層（預設 true） */
+  runtime?: boolean;
 }
 
 export type ApplyStatus = 'applied' | 'dry-run' | 'already-applied' | 'unsupported' | 'no-match';
@@ -46,6 +60,17 @@ export interface ApplyResult {
   files: { path: string; hits: number; role: ManifestFileRole }[];
   warnings: string[];
   manifestPath: string;
+  /** asar 目標：執行期注入層資訊 */
+  runtime?: RuntimeLayerInfo;
+  /** asar 目標：封存檔內會被修改或新增的檔案 */
+  asarEntries?: AsarEntryChange[];
+}
+
+export interface AsarEntryChange {
+  path: string;
+  /** static：靜態字串替換；hook：注入主行程掛鉤；runtime：新增的 runtime 檔案 */
+  kind: 'static' | 'hook' | 'runtime';
+  hits: number;
 }
 
 export type FileState = 'original' | 'patched' | 'changed' | 'missing';
@@ -166,7 +191,9 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
       const unpackedDir = `${asarPath}.unpacked`;
       const entries = archiver.list(src.from);
       const translated = new Map<string, Buffer>();
+      const changes: AsarEntryChange[] = [];
       let asarHits = 0;
+      // ── 靜態層：翻譯主行程原生選單、系統匣、更新提示、載入畫面等靜態字串 ──
       for (const e of entries) {
         if (e.type !== 'file' || e.unpacked || !isAsarContent(e.path)) continue;
         const text = archiver.readFile(src.from, e.path).toString('utf8');
@@ -174,16 +201,56 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
         mergeHits(stats, r.hits);
         if (r.changed) {
           translated.set(e.path, Buffer.from(r.output, 'utf8'));
+          changes.push({ path: e.path, kind: 'static', hits: r.totalHits });
           asarHits += r.totalHits;
         }
       }
+
+      // ── 執行期注入層：寫入 runtime 並在主行程入口掛鉤 ──
+      const writeList = [...entries];
+      const counts = countRuntimeEntries(ctx.dict);
+      let runtime: RuntimeLayerInfo = { enabled: false, ...counts };
+      if (ctx.runtime === false) {
+        runtime.reason = '已以 --no-runtime 停用';
+      } else {
+        const fileSet = new Set(entries.filter((e) => e.type === 'file' && !e.unpacked).map((e) => e.path));
+        const pkg = fileSet.has('package.json') ? parsePackageJson(archiver.readFile(src.from, 'package.json').toString('utf8')) : null;
+        const main = resolveMainEntry(pkg, fileSet);
+        if (!main) {
+          runtime.reason = '找不到 package.json 的 main 入口，僅套用靜態層';
+          warnings.push(`app.asar：${runtime.reason}`);
+        } else {
+          const format = detectModuleFormat(main, pkg);
+          const runtimeFile = runtimeEntryPath(main);
+          const original = (translated.get(main) ?? archiver.readFile(src.from, main)).toString('utf8');
+          if (hasHook(original)) warnings.push(`${main} 已含舊的 antigravity-i18n 注入標記，已移除後重新注入。`);
+          translated.set(main, Buffer.from(injectHook(original, format, RUNTIME_FILE_NAME), 'utf8'));
+          const staticChange = changes.find((c) => c.path === main);
+          if (staticChange) staticChange.kind = 'hook';
+          else changes.push({ path: main, kind: 'hook', hits: 0 });
+
+          translated.set(runtimeFile, Buffer.from(buildRuntimeScript(ctx.dict, { lang: ctx.lang, version: ctx.toolVersion ?? '0.0.0' }), 'utf8'));
+          changes.push({ path: runtimeFile, kind: 'runtime', hits: 0 });
+          if (!fileSet.has(runtimeFile)) {
+            const at = writeList.findIndex((e) => e.path === main);
+            writeList.splice(at + 1, 0, { path: runtimeFile, type: 'file', unpacked: false });
+          }
+          runtime = { enabled: true, ...counts, mainEntry: main, runtimeFile, format };
+        }
+      }
+      base.runtime = runtime;
+      base.asarEntries = changes;
+      if (process.platform === 'win32' || asarPath.startsWith('/mnt/')) {
+        warnings.push('Windows 版 Electron 可能啟用 asar 完整性檢查；若套用後 App 無法啟動，請執行 restore 還原。');
+      }
+
       if (translated.size > 0) {
         // dry-run 只列出預計修改的檔案，不建立暫存 asar
         let tmpAsar: string | undefined;
         if (!ctx.dryRun) {
           tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'antigravity-i18n-'));
           tmpAsar = path.join(tmpDir, 'app.asar');
-          const writeEntries: AsarWriteEntry[] = entries.map((e) => {
+          const writeEntries: AsarWriteEntry[] = writeList.map((e) => {
             if (e.type !== 'file') return e;
             const data = translated.get(e.path);
             if (data) return { ...e, read: () => data };
@@ -311,6 +378,9 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
       backupDir,
       files: records,
       stats: { totalKeys: stats.totalKeys, matchedKeys: stats.matchedKeys, totalHits: stats.totalHits, coverage: stats.coverage },
+      runtime: base.runtime?.enabled
+        ? { entries: base.runtime.entries, mainEntry: base.runtime.mainEntry!, runtimeFile: base.runtime.runtimeFile! }
+        : undefined,
     };
     writeManifest(manifestPath, manifest);
     if (existing && existing.backupDir !== backupDir) removeBackupDir(ctx.toolHome, existing.backupDir);

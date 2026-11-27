@@ -40,13 +40,20 @@ program
   .option('-p, --path <customPath>', '手動指定安裝路徑（需搭配單一 --target）')
   .option('--dry-run', '只預覽命中字串數與預計覆蓋率，不修改任何檔案')
   .option('-f, --force', '已套用過時仍強制重新套用（可用於切換語系）')
+  .option('--no-runtime', 'app 目標：停用執行期 DOM 注入層，只套用靜態字串替換')
   .addHelpText(
     'after',
     `
 範例：
   $ antigravity-i18n apply --lang zh-TW --dry-run
   $ antigravity-i18n apply --lang zh-TW --target ide
-  $ antigravity-i18n apply --lang zh-CN --target app --path "/Applications/Antigravity App.app" --force`,
+  $ antigravity-i18n apply --lang zh-CN --target app --path "/Applications/Antigravity App.app" --force
+  $ antigravity-i18n apply --lang zh-TW --target app --no-runtime
+
+app 目標採雙層機制：
+  靜態層      翻譯 app.asar 內主行程的原生選單、系統匣、更新提示與載入畫面
+  執行期注入層 將詞庫與 runtime 寫入 app.asar，視窗載入後即時翻譯 UI（排除程式碼、
+              編輯器、終端機、輸入框與 AI 回覆正文）；可用 --no-runtime 停用`,
   )
   .action(async (opts) => run(() => applyCommand(opts)));
 

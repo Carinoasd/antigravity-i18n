@@ -64,15 +64,21 @@ const UI_PROPS = [
   'enumDescriptions',
   'enumItemLabels',
   'category',
+  // Electron 主行程：Menu / Tray / Notification / dialog
+  'sublabel',
+  'toolTip',
+  'body',
+  'buttons',
+  'checkboxLabel',
 ];
 
 const UI_PROP_SET = new Set(UI_PROPS);
 
-/** 字串常值前方（≤ 80 字元）符合下列任一模式即視為 UI 語境 */
+/** 字串常值前方（≤ 160 字元）符合下列任一模式即視為 UI 語境 */
 const CODE_CONTEXT_RE = new RegExp(
   [
-    // label: "..."、title = "..."、"label": "..."
-    `(?:^|[^\\w$-])["']?(?:${UI_PROPS.map((p) => p.replace('-', '\\-')).join('|')})["']?\\s*[:=]\\s*\\[?\\s*$`,
+    // label: "..."、title = "..."、"label": "..."、buttons: ["Restart Now", "Later"]
+    `(?:^|[^\\w$-])["']?(?:${UI_PROPS.map((p) => p.replace('-', '\\-')).join('|')})["']?\\s*[:=]\\s*(?:\\[(?:\\s*(?:"[^"\\n]*"|'[^'\\n]*')\\s*,)*)?\\s*$`,
     // localize("key", "...") / localize2(123, "...") / nls.localize({...}, "...")
     `\\blocalize2?\\s*\\(\\s*(?:"[^"\\n]*"|'[^'\\n]*'|[\\w$.]+|\\{[^{}]{0,60}\\})\\s*,\\s*$`,
     // React.createElement("div", null, "...") / jsx("span", {...}, "...") / h("b", null, "...")
@@ -81,6 +87,8 @@ const CODE_CONTEXT_RE = new RegExp(
     `\\.(?:textContent|innerText|title|placeholder|ariaLabel)\\s*=\\s*$`,
     // showInformationMessage("...") / alert("...") / confirm("...")
     `\\b(?:show(?:Information|Warning|Error)Message|alert|confirm|setStatusBarMessage)\\s*\\(\\s*$`,
+    // tray.setToolTip("...") / win.setTitle("...") / showErrorBox("...", "...")
+    `\\b(?:setToolTip|setTitle|showErrorBox)\\s*\\((?:\\s*(?:"[^"\\n]*"|'[^'\\n]*')\\s*,)?\\s*$`,
   ].join('|'),
 );
 
@@ -178,7 +186,7 @@ export class Translator {
       // 避免吃到跳脫引號的一半：前一字元是反斜線就略過
       if (offset > 0 && content[offset - 1] === '\\') return lit;
       if (!isDistinctive(key)) {
-        const before = content.slice(Math.max(0, offset - 80), offset);
+        const before = content.slice(Math.max(0, offset - 160), offset);
         if (!CODE_CONTEXT_RE.test(before)) return lit;
       }
       this.bump(hits, key);

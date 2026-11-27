@@ -52,6 +52,15 @@ describe('code 模式（JS bundle）', () => {
     expect(t.translate(src, { filename: 'a.js' }).changed).toBe(false);
   });
 
+  it('Electron 主行程：選單、對話框按鈕陣列、系統匣', () => {
+    const d = { ...dict, Later: '稍後', 'Restart Now': '立即重新啟動', Quit: '結束' };
+    const tr = new Translator(d);
+    const src = `dialog.showMessageBox({buttons:["Restart Now","Later"]});tray.setToolTip("Settings");m={sublabel:"Run",toolTip:'Off'};x=["Later"]`;
+    expect(tr.translate(src, { filename: 'a.js' }).output).toBe(
+      `dialog.showMessageBox({buttons:["立即重新啟動","稍後"]});tray.setToolTip("設定");m={sublabel:"執行",toolTip:'關閉'};x=["Later"]`,
+    );
+  });
+
   it('保留佔位符', () => {
     const r = t.translate(`{message:"Reading file %s"}`, { filename: 'a.js' });
     expect(r.output).toBe(`{message:"正在讀取檔案 %s"}`);

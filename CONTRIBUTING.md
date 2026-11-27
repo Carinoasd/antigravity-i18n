@@ -27,8 +27,9 @@ locales/
 │   ├── permissions.json      # 權限、核准對話框、終端機執行政策
 │   ├── chat.json             # 對話面板、Artifacts、審查變更
 │   ├── ide.json              # 編輯器選單、終端機、Git、Agent 面板
-│   └── cli.json              # agy 命令列工具
-└── zh-CN/                    # 簡體中文（同樣 6 個模組）
+│   ├── cli.json              # agy 命令列工具
+│   └── menu.json             # Electron 原生選單、系統匣、更新提示、載入畫面
+└── zh-CN/                    # 簡體中文（同樣 7 個模組）
 ```
 
 每個 JSON 都是扁平物件：**key 是英文原文（必須與 Antigravity 介面上的字串完全一致，含大小寫與標點）**，value 是譯文。
@@ -39,6 +40,10 @@ locales/
   "{count} files changed": "已變更 {count} 個檔案"
 }
 ```
+
+不同模組可以有相同的 key（例如 `menu.json` 與 `ide.json` 都有 `Edit`），但**譯文必須一致**，否則 `validate` 會報錯。
+
+`app` 目標使用 `sidebar`、`settings`、`permissions`、`chat`、`menu` 五個模組；這些詞條同時用於靜態層與執行期注入層。
 
 ### 新增字串
 
@@ -56,6 +61,10 @@ locales/
   因為 `"Off"` 很可能同時是設定值或列舉值，盲目替換會讓功能壞掉。
 - `nls.messages.json`、`*.nls.json` 內全部都是顯示文字，會完整替換。
 - 不會修改 `node_modules/`、`package.json` 與 asar 的 unpacked 檔案。
+
+### 執行期注入層的比對方式
+
+執行期注入層在畫面上做**完全相符**比對（去除前後空白、合併連續空白），因此 key 必須是畫面上「一個文字節點」的完整內容。若介面把一段文字拆成多個元素（例如 `<b>3</b> files`），請以實際的單一節點文字為 key。含 `{name}`、`%s`、`%d` 的 key 會自動轉成樣式比對。
 
 ## 翻譯用語規範
 
@@ -119,6 +128,7 @@ locales/
 - [ ] 遵守上方用語規範，沒有繁簡混用
 - [ ] 佔位符與保護詞皆已原樣保留
 - [ ] 修改程式碼時已補上對應的單元測試
+- [ ] 修改 `src/runtime/overlay.ts` 時維持函式自足（不引用外部變數或 import），並確認保護區域測試仍通過
 - [ ] 若變更 CLI 行為，已同步更新 `README.md`
 
 ## 回報問題

@@ -10,6 +10,8 @@ export interface ApplyOptions {
   path?: string;
   dryRun?: boolean;
   force?: boolean;
+  /** commander 的 --no-runtime 會設為 false */
+  runtime?: boolean;
 }
 
 function printTopHits(r: ApplyResult, n = 5): void {
@@ -18,6 +20,38 @@ function printTopHits(r: ApplyResult, n = 5): void {
     .slice(0, n);
   if (top.length === 0) return;
   console.log(`  ${pc.dim('命中最多：')}${top.map(([k, c]) => `${k} ×${c}`).join(pc.dim('、'))}`);
+}
+
+const CHANGE_LABEL = { static: '靜態', hook: '掛鉤', runtime: '新增' } as const;
+
+/** 輸出套用 / 預覽摘要；asar 目標分開列出靜態層與執行期注入層 */
+export function printSummary(r: ApplyResult): void {
+  const s = r.stats;
+  const dry = r.status === 'dry-run';
+  const layer = r.runtime ? '靜態層' : '命中詞彙';
+  console.log(`  ${sym.dot} ${layer}：命中 ${s.matchedKeys}/${s.totalKeys} 條詞彙（覆蓋率 ${pc.bold(pct(s.coverage))}），共 ${s.totalHits} 處替換`);
+  if (r.runtime) {
+    const rt = r.runtime;
+    if (rt.enabled) {
+      const pattern = rt.patternEntries > 0 ? `，其中 ${rt.patternEntries} 條含佔位符` : '';
+      console.log(
+        `  ${sym.dot} 執行期注入層：${dry ? '將隨' : '已隨'} runtime 載入 ${pc.bold(String(rt.entries))} 條詞彙${pattern}` +
+          `，掛載於 ${rt.mainEntry}（${rt.format}）`,
+      );
+    } else {
+      console.log(`  ${sym.dot} 執行期注入層：${pc.dim(`未啟用（${rt.reason ?? '未知原因'}）`)}`);
+    }
+  }
+  console.log(`  ${sym.dot} ${dry ? '將修改' : '已修改'}檔案：${r.files.length} 個`);
+  for (const f of r.files) console.log(`     ${pc.dim(`[${f.role}]`)} ${f.path} ${pc.dim(`(${f.hits} 處)`)}`);
+  if (r.asarEntries && r.asarEntries.length > 0) {
+    console.log(`  ${sym.dot} app.asar 內容：`);
+    for (const c of r.asarEntries) {
+      const hits = c.kind === 'runtime' ? '' : pc.dim(` (${c.hits} 處)`);
+      console.log(`     ${pc.dim(`[${CHANGE_LABEL[c.kind]}]`)} ${c.path}${hits}`);
+    }
+  }
+  printTopHits(r);
 }
 
 export async function applyCommand(opts: ApplyOptions): Promise<number> {
@@ -44,7 +78,15 @@ export async function applyCommand(opts: ApplyOptions): Promise<number> {
     const dict = loadDictionary(lang, TARGET_MODULES[id]);
     let r: ApplyResult;
     try {
-      r = await applyTarget(target, { lang, dict, toolHome: home, dryRun: opts.dryRun, force: opts.force, toolVersion });
+      r = await applyTarget(target, {
+        lang,
+        dict,
+        toolHome: home,
+        dryRun: opts.dryRun,
+        force: opts.force,
+        toolVersion,
+        runtime: opts.runtime !== false,
+      });
     } catch (e) {
       failures++;
       console.log(`  ${sym.fail} ${pc.red((e as Error).message)}\n`);
@@ -66,11 +108,7 @@ export async function applyCommand(opts: ApplyOptions): Promise<number> {
       default:
         break;
     }
-    const s = r.stats;
-    console.log(`  ${sym.dot} 命中詞彙：${s.matchedKeys}/${s.totalKeys}（預計覆蓋率 ${pc.bold(pct(s.coverage))}），共 ${s.totalHits} 處替換`);
-    console.log(`  ${sym.dot} ${r.status === 'dry-run' ? '將修改' : '已修改'}檔案：${r.files.length} 個`);
-    for (const f of r.files) console.log(`     ${pc.dim(`[${f.role}]`)} ${f.path} ${pc.dim(`(${f.hits} 處)`)}`);
-    printTopHits(r);
+    printSummary(r);
     if (r.status === 'applied') {
       console.log(`  ${sym.ok} ${pc.green('完成！')}已備份原始檔並寫入 manifest：${pc.dim(r.manifestPath)}`);
       console.log(`  ${pc.dim('重新啟動 Antigravity 後生效；如需還原：antigravity-i18n restore --target ' + id)}`);
