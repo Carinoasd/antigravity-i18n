@@ -8,12 +8,12 @@ export type TargetId = (typeof TARGET_IDS)[number];
 export type TargetSelector = TargetId | 'all';
 
 /** 詞庫模組（每個語系各一份 JSON） */
-export const LOCALE_MODULES = ['sidebar', 'settings', 'permissions', 'chat', 'ide', 'cli'] as const;
+export const LOCALE_MODULES = ['sidebar', 'settings', 'permissions', 'chat', 'ide', 'cli', 'menu'] as const;
 export type LocaleModule = (typeof LOCALE_MODULES)[number];
 
 /** 每個目標會載入哪些詞庫模組 */
 export const TARGET_MODULES: Record<TargetId, readonly LocaleModule[]> = {
-  app: ['sidebar', 'settings', 'permissions', 'chat'],
+  app: ['sidebar', 'settings', 'permissions', 'chat', 'menu'],
   ide: ['sidebar', 'settings', 'permissions', 'chat', 'ide'],
   cli: ['cli', 'permissions', 'chat'],
 };
@@ -85,4 +85,6 @@ export interface Manifest {
   backupDir: string;
   files: ManifestFile[];
   stats: Omit<TranslateStats, 'hitsByKey'>;
+  /** asar 目標的執行期注入層（未啟用時不存在） */
+  runtime?: { entries: number; mainEntry: string; runtimeFile: string };
 }

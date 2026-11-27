@@ -3,6 +3,7 @@
 跨平台（Linux / macOS / Windows）的 **Google Antigravity 中文化 CLI 工具**，支援 **繁體中文（`zh-TW`）** 與 **簡體中文（`zh-CN`）**。
 
 - 🖥️ 支援 Antigravity **App**（桌面版 2.0+，`app.asar`）、**IDE**（編輯器與 Agent 面板）、**CLI**（`agy`）
+- 🧩 App 採**雙層機制**：靜態翻譯主行程選單／系統匣／更新提示，加上**執行期 DOM 注入層**即時翻譯動態載入的 React UI
 - 🔒 套用前自動計算 SHA-256、備份原始檔並寫入 Manifest，可**一鍵無損還原**
 - 🧪 `--dry-run` 先預覽命中字串數與覆蓋率，不動任何檔案
 - 🪶 **零侵入模式**：只安裝全域規則，讓 AI 全程以中文回覆，完全不修改安裝檔
@@ -69,7 +70,7 @@ antigravity-i18n status --target app --path "/Applications/Antigravity.app"
 ### `apply`
 
 ```bash
-antigravity-i18n apply --lang <zh-TW|zh-CN> [--target <app|ide|cli|all>] [--path <customPath>] [--dry-run] [--force]
+antigravity-i18n apply --lang <zh-TW|zh-CN> [--target <app|ide|cli|all>] [--path <customPath>] [--dry-run] [--force] [--no-runtime]
 ```
 
 | 選項 | 說明 |
@@ -79,12 +80,13 @@ antigravity-i18n apply --lang <zh-TW|zh-CN> [--target <app|ide|cli|all>] [--path
 | `-p, --path` | 手動指定安裝路徑，需搭配單一 `--target` |
 | `--dry-run` | 只預覽命中字串數與預計覆蓋率，不修改任何檔案 |
 | `-f, --force` | 已套用過時仍強制重新套用（例如切換語系） |
+| `--no-runtime` | `app` 目標：停用執行期 DOM 注入層，只套用靜態字串替換 |
 
 套用流程：
 
 1. 偵測安裝路徑並計算原始檔 SHA-256
 2. 將原始檔備份到 `~/.antigravity-i18n/backups/`，並回讀校驗
-3. 套用詞庫替換（只替換完整字串常值，詳見[替換規則](#替換規則)）
+3. 套用詞庫替換（只替換完整字串常值，詳見[替換規則](#替換規則)）；`app` 目標另外寫入執行期注入層（詳見[App 雙層機制](#app-雙層機制)）
 4. IDE：同步更新 `product.json` 的 `checksums`，避免「安裝似乎已損毀」提示
 5. macOS App：同步更新 `Info.plist` 的 `ElectronAsarIntegrity`
 6. 寫入 Manifest 到 `~/.antigravity-i18n/manifests/` 並輸出摘要
@@ -188,16 +190,79 @@ antigravity-i18n validate --dir ./locales
 - 名稱含 `antigravity` / `agent` 的內建擴充功能：`package.nls.json` 與 `dist/`、`out/`、`webview/` 內的 JS / HTML
 - `product.json` 的 `checksums`（僅同步雜湊，不改其他內容）
 
+## App 雙層機制
+
+Antigravity 2.0 桌面版的 `app.asar` 裡只有 Electron 主行程與殼層（`dist/main.js`、`menu.js`、`tray.js`、`preload.js`、`updater.js` 等），真正的 React UI 是在執行期動態載入的。純靜態字串替換只能翻到殼層文字，因此 `app` 目標採用兩層：
+
+| 層 | 做什麼 | 寫入位置 |
+| --- | --- | --- |
+| **靜態層** | 翻譯主行程的原生選單、系統匣、更新提示、對話框按鈕與載入畫面（詞庫 `menu.json` 等） | asar 內既有的 JS / HTML |
+| **執行期注入層** | 視窗載入後以 `MutationObserver` + `TreeWalker` 即時翻譯 UI 文字節點與 `title` / `placeholder` / `aria-label` 屬性 | 新增 `antigravity-i18n-runtime.js`，並在主行程入口掛鉤 |
+
+### 執行期注入層如何運作
+
+1. 打包時，把選定語系的詞庫與零依賴的 runtime 一起寫成 asar 內的 `antigravity-i18n-runtime.js`（放在 `package.json` `main` 入口旁）。
+2. 在主行程入口最前面插入一小段掛鉤（以 `/* antigravity-i18n:runtime-hook:begin */` … `end */` 標記）：
+   註冊 `app.on('web-contents-created')`，在每個視窗 `dom-ready` 時以 `webContents.executeJavaScript()` 注入 runtime。
+   - 支援 CommonJS 與 ESM 入口（依 `package.json` `type` 與副檔名判斷）
+   - 只注入應用程式自己的視窗（`window` / `browserView`），不注入 `<webview>`、DevTools 與背景頁
+   - 每次載入都檢查網址，只注入 App 內部頁面：`file:`、App 自訂 scheme（如 `app:`），以及本機的 `http(s)://localhost`、`127.0.0.1`、`[::1]`；
+     **外部 `http:` / `https:` 網站（例如內建瀏覽器開啟的網頁）一律略過**，`devtools:`、`chrome:`、`chrome-extension:`、`chrome-error:`、`about:`、`data:` 也不注入
+   - 讀不到 runtime 或發生任何錯誤時只會在主控台警告，不影響 App 啟動
+3. runtime 在頁面中以 `window.__ANTIGRAVITY_I18N__` 為標記，同一份文件不會重複安裝。
+
+### 嚴格排除的保護區域
+
+以下元素（含自身與所有子孫）的文字與屬性**一律不動**：
+
+- 程式碼：`<code>`、`<pre>`、`<kbd>`、`<samp>`
+- 編輯器與終端機：`.monaco-editor`、`.xterm`
+- 可編輯區域：`[contenteditable]`（`contenteditable="false"` 除外）、`[role="textbox"]`
+- AI 回覆的 Markdown 正文：`.markdown`、`.markdown-body`、`.prose`、`class` 含 `markdown` 的元素
+- `<script>`、`<style>`、`<svg>`、`<template>` 等非文字內容
+- 任何加上 `data-antigravity-i18n-skip` 屬性的元素
+
+`<input>`、`<textarea>`、`<select>` 的**內容**（值與子節點）絕不改動，打字不受影響；只翻譯它們的 `placeholder` / `title` / `aria-label` 提示屬性。
+
+### 比對規則
+
+- 文字節點與屬性值去除前後空白、合併連續空白後**完全相符**才替換，前後空白會保留
+- 含佔位符的詞條轉成樣式比對，例如 `{count} files changed` 可翻譯畫面上的 `3 files changed` → `已變更 3 個檔案`
+
+### 停用與還原
+
+- 只想要靜態層：`apply --lang zh-TW --target app --no-runtime --force`
+- 臨時停用執行期注入層：以環境變數 `ANTIGRAVITY_I18N_DISABLE=1` 啟動 Antigravity
+- 完全移除：`antigravity-i18n restore --target app`，以原始 `app.asar` 備份 100% 還原（runtime 檔案與掛鉤一併消失）
+
+`--dry-run` 會分開顯示兩層（以下為模擬 Antigravity 2.0 殼層結構的實際輸出）：
+
+```
+■ app  Antigravity App（桌面版）
+  • 靜態層：命中 14/216 條詞彙（覆蓋率 6.5%），共 14 處替換
+  • 執行期注入層：將隨 runtime 載入 216 條詞彙，其中 6 條含佔位符，掛載於 dist/main.js（cjs）
+  • 將修改檔案：1 個
+     [content] …/Antigravity/resources/app.asar (14 處)
+  • app.asar 內容：
+     [靜態] dist/menu.js (8 處)
+     [靜態] dist/tray.js (2 處)
+     [靜態] dist/updater.js (4 處)
+     [掛鉤] dist/main.js (0 處)
+     [新增] dist/antigravity-i18n-runtime.js
+```
+
+靜態層覆蓋率偏低是正常的：殼層本來就只有少量文字，介面主體由執行期注入層負責。
+
 ## 替換規則
 
 Electron / VS Code 的 bundle 裡，`"Off"`、`"Run"` 這類短字串常常同時被當成設定值或列舉值，盲目全域取代會讓功能壞掉。因此翻譯引擎：
 
 - 只替換**完整的字串常值**（`"..."`、`'...'`、`` `...` ``），不會替換部分相符的字串
 - **長字串**（含空白且長度 ≥ 8）在任何位置都會替換
-- **短字串**只在 UI 語境替換：`label:`、`title:`、`tooltip:`、`placeholder:`、`children:`、`localize(key, "...")`、`createElement(tag, props, "...")` 等
+- **短字串**只在 UI 語境替換：`label:`、`title:`、`tooltip:`、`placeholder:`、`children:`、`buttons: [...]`、`setToolTip(...)`、`localize(key, "...")`、`createElement(tag, props, "...")` 等
 - JSON 只替換「值」、不動 key；`nls.messages.json` 與 `*.nls.json` 全部替換
 - HTML 替換文字節點與 `title` / `placeholder` / `aria-label` / `alt` 屬性
-- 不修改 `node_modules/`、`package.json`，以及 asar 的 unpacked 原生模組
+- 不修改 `node_modules/`、`__mocks__/`、`package.json`，以及 asar 的 unpacked 原生模組
 
 因此 `--dry-run` 顯示的覆蓋率是「詞庫中有多少條在這個版本的檔案裡被找到」，會隨 Antigravity 版本而變化。
 
@@ -261,13 +326,17 @@ src/
 │   ├── translator.ts      # 替換引擎
 │   ├── backup.ts          # SHA-256、備份、Manifest
 │   ├── patcher.ts         # 套用 / 狀態 / 還原
+│   ├── runtime.ts         # 執行期注入層：產生 runtime 腳本與主行程掛鉤
 │   └── rules.ts           # 全域規則
+├── runtime/overlay.ts     # 注入 renderer 的 DOM 翻譯 runtime（零依賴、自足）
 └── commands/              # status / apply / restore / rules / validate
-locales/                   # 詞庫（zh-TW、zh-CN 各 6 個模組）
+locales/                   # 詞庫（zh-TW、zh-CN 各 7 個模組）
 tests/                     # vitest 單元測試
 ```
 
 ## 開發
+
+開發規範、繁簡用語準則與分支協作原則請見 [AGENTS.md](./AGENTS.md)（Claude Code 透過 `CLAUDE.md` 引用同一份）。
 
 ```bash
 npm install

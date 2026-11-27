@@ -58,7 +58,12 @@ export async function statusCommand(opts: StatusOptions = {}): Promise<number> {
           : pc.dim('已還原為原始版本（manifest 殘留）');
     console.log(`  ${sym.dot} 中文化：${label}`);
     console.log(`  ${sym.dot} 套用時間：${m.appliedAt}　工具版本：${m.toolVersion}`);
-    console.log(`  ${sym.dot} 覆蓋率：${pct(m.stats.coverage)}（${m.stats.matchedKeys}/${m.stats.totalKeys} 條詞彙，共 ${m.stats.totalHits} 處）`);
+    console.log(`  ${sym.dot} ${m.runtime ? '靜態層' : ''}覆蓋率：${pct(m.stats.coverage)}（${m.stats.matchedKeys}/${m.stats.totalKeys} 條詞彙，共 ${m.stats.totalHits} 處）`);
+    if (m.runtime) {
+      console.log(`  ${sym.dot} 執行期注入層：已啟用（${m.runtime.entries} 條詞彙，掛載於 ${m.runtime.mainEntry}）`);
+    } else if (m.kind === 'asar') {
+      console.log(`  ${sym.dot} 執行期注入層：${pc.dim('未啟用')}`);
+    }
     for (const f of st.files) {
       const b = f.backupOk ? pc.green('備份正常') : pc.red(`備份異常：${f.backupReason}`);
       console.log(`     ${pc.dim(f.role.padEnd(9))} ${FILE_STATE_LABEL[f.state]}　${b}`);

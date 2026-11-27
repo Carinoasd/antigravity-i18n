@@ -29,7 +29,7 @@ describe('內建詞庫', () => {
     expect(report.keyCount['zh-CN']).toBeGreaterThanOrEqual(150);
   });
 
-  it('6 個模組 zh-TW 與 zh-CN 的 key 完全一致', () => {
+  it('所有模組 zh-TW 與 zh-CN 的 key 完全一致', () => {
     for (const mod of LOCALE_MODULES) {
       const tw = Object.keys(loadModule(dir, 'zh-TW', mod)).sort();
       const cn = Object.keys(loadModule(dir, 'zh-CN', mod)).sort();
@@ -51,6 +51,10 @@ describe('內建詞庫', () => {
     expect(cn['Command Palette']).toBe('命令面板');
     expect(tw['Projects']).toBe('專案');
     expect(cn['Projects']).toBe('项目');
+    expect(tw['Paste']).toBe('貼上');
+    expect(cn['Paste']).toBe('粘贴');
+    expect(tw['Toggle Full Screen']).toBe('切換全螢幕');
+    expect(cn['Toggle Full Screen']).toBe('切换全屏');
   });
 
   it('保護詞包含斜線指令與技術術語', () => {
@@ -152,6 +156,17 @@ describe('validateLocales 能抓出錯誤', () => {
     const errs = errors();
     expect(errs.some((m) => m.includes('命令選擇區'))).toBe(true);
     expect(errs.some((m) => m.includes('繁體字'))).toBe(true);
+  });
+
+  it('跨模組同名 key 譯文不一致', () => {
+    fixture();
+    patch('zh-TW', 'menu', (d) => (d['Copy'] = '拷貝'));
+    expect(errors().some((m) => m.includes('同名 key 譯文不一致'))).toBe(true);
+  });
+
+  it('跨模組同名 key 譯文相同時不報錯也不警告', () => {
+    const report = validateLocales(defaultLocalesDir());
+    expect(report.issues).toEqual([]);
   });
 
   it('保護詞清單格式錯誤', () => {

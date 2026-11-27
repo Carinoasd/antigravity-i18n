@@ -239,11 +239,10 @@ export function validateLocales(dir = defaultLocalesDir()): ValidationReport {
     for (const mod of LOCALE_MODULES) {
       for (const [k, v] of Object.entries(loaded[lang]?.[mod] ?? {})) {
         const prev = seen.get(k);
+        // 譯文相同的重複 key 允許存在（讓各模組可自成一套）；不同則會互相覆蓋，視為錯誤
         if (prev && prev.value !== v) {
           err(moduleFile(dir, lang, mod), `與 ${prev.mod}.json 的同名 key 譯文不一致（「${prev.value}」 vs 「${v}」）`, k);
-        } else if (prev) {
-          issues.push({ level: 'warning', file: rel(moduleFile(dir, lang, mod)), key: k, message: `與 ${prev.mod}.json 重複` });
-        } else {
+        } else if (!prev) {
           seen.set(k, { mod, value: v });
         }
       }

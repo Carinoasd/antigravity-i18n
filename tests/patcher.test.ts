@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as asar from '@electron/asar';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { applyCommand } from '../src/commands/apply.js';
 import { appInstallCandidates, cliCandidates, detectTarget, ideInstallCandidates, isWsl, type PathEnv } from '../src/config/paths.js';
 import { electronAsarArchiver, type AsarArchiver, type AsarEntry, type AsarWriteEntry } from '../src/core/asar.js';
 import { readManifest, sha256 } from '../src/core/backup.js';
 import { applyTarget, inspectTarget, restoreManifest, vscodeChecksum } from '../src/core/patcher.js';
+import { HOOK_BEGIN, RUNTIME_FILE_NAME, RUNTIME_MARKER } from '../src/core/runtime.js';
 import type { DetectedTarget, Dictionary } from '../src/types.js';
 import { rm, tmpDir, write } from './helpers.js';
 
@@ -224,6 +226,9 @@ describe('App（app.asar）套用與還原', () => {
     const dry = await applyTarget(target, { lang: 'zh-TW', dict: dictTW, toolHome: home, dryRun: true });
     expect(dry.stats.matchedKeys).toBe(2);
     expect(dry.files).toEqual([{ path: asarPath, role: 'content', hits: 2 }]);
+    // package.json 沒有 main（預設 index.js 也不存在）→ 只套用靜態層
+    expect(dry.runtime).toMatchObject({ enabled: false });
+    expect(dry.warnings.some((w) => w.includes('main 入口'))).toBe(true);
     expect(fs.readFileSync(asarPath)).toEqual(original);
     expect(fs.existsSync(home)).toBe(false);
 
@@ -280,5 +285,176 @@ describe('App（app.asar）套用與還原', () => {
     expect(fs.readFileSync(asarPath, 'utf8')).toBe('fake-archive');
     await restoreManifest(r.manifestPath, { toolHome: home, archiver: fake });
     expect(fs.readFileSync(asarPath, 'utf8')).toBe('orig-archive');
+  });
+});
+
+describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
+  const dictApp: Dictionary = {
+    Settings: '設定',
+    'Check for Updates': '檢查更新',
+    'Update Available': '有可用的更新',
+    'Restart Now': '立即重新啟動',
+    Later: '稍後',
+    'Open Antigravity': '開啟 Antigravity',
+    'Accept All': '全部接受',
+    '{count} files changed': '已變更 {count} 個檔案',
+  };
+  const MAIN_CJS = `'use strict';\nconst { app } = require('electron');\nrequire('./menu.js');\n`;
+
+  /** 模擬 Antigravity 2.0：asar 只有主行程與殼層，UI 於執行期載入 */
+  async function makeElectronApp(opts: { type?: 'module' } = {}): Promise<{ asarPath: string; target: DetectedTarget }> {
+    const src = path.join(dir, 'app-src');
+    const pkg: Record<string, string> = { name: 'antigravity', main: './dist/main.js' };
+    if (opts.type) pkg.type = opts.type;
+    write(path.join(src, 'package.json'), JSON.stringify(pkg));
+    write(path.join(src, 'dist', 'main.js'), opts.type === 'module' ? `import { app } from 'electron';\napp.whenReady();\n` : MAIN_CJS);
+    write(path.join(src, 'dist', 'menu.js'), `Menu.buildFromTemplate([{label:"Settings"},{label:"Check for Updates",click:check}]);`);
+    write(path.join(src, 'dist', 'updater.js'), `dialog.showMessageBox({message:"Update Available",buttons:["Restart Now","Later"]});`);
+    write(path.join(src, 'dist', 'tray.js'), `tray.setToolTip("Open Antigravity");if(mode==="Later"){}`);
+    write(path.join(src, 'dist', 'preload.js'), `contextBridge.exposeInMainWorld("x",{});`);
+    write(path.join(src, 'dist', '__mocks__', 'electron.js'), `module.exports={menu:{label:"Settings"}};`);
+    const root = path.join(dir, 'Antigravity2');
+    const asarPath = path.join(root, 'resources', 'app.asar');
+    fs.mkdirSync(path.dirname(asarPath), { recursive: true });
+    await asar.createPackageWithOptions(src, asarPath, {});
+    const target = detectTarget('app', { customPath: root });
+    if (!target) throw new Error('detect failed');
+    return { asarPath, target };
+  }
+
+  const read = (asarPath: string, p: string): string => {
+    asar.uncacheAll();
+    return asar.extractFile(asarPath, p.split('/').join(path.sep)).toString('utf8');
+  };
+
+  it('dry-run 分開回報靜態層命中與執行期詞庫條數，且不寫入任何檔案', async () => {
+    const { asarPath, target } = await makeElectronApp();
+    const before = fs.readFileSync(asarPath);
+    const r = await applyTarget(target, { lang: 'zh-TW', dict: dictApp, toolHome: home, dryRun: true, toolVersion: '1.2.3' });
+    expect(r.status).toBe('dry-run');
+    // 靜態層：選單 2、更新提示 3、系統匣 1（mode==="Later" 不是 UI 語境，不替換）
+    expect(r.stats.totalHits).toBe(6);
+    expect(r.stats.matchedKeys).toBe(6);
+    expect(r.runtime).toEqual({
+      enabled: true,
+      entries: 8,
+      patternEntries: 1,
+      mainEntry: 'dist/main.js',
+      runtimeFile: `dist/${RUNTIME_FILE_NAME}`,
+      format: 'cjs',
+    });
+    expect(r.asarEntries).toEqual([
+      { path: 'dist/menu.js', kind: 'static', hits: 2 },
+      { path: 'dist/tray.js', kind: 'static', hits: 1 },
+      { path: 'dist/updater.js', kind: 'static', hits: 3 },
+      { path: 'dist/main.js', kind: 'hook', hits: 0 },
+      { path: `dist/${RUNTIME_FILE_NAME}`, kind: 'runtime', hits: 0 },
+    ]);
+    expect(r.files).toEqual([{ path: asarPath, role: 'content', hits: 6 }]);
+    expect(fs.readFileSync(asarPath)).toEqual(before);
+    expect(fs.existsSync(home)).toBe(false);
+  });
+
+  it('套用：靜態翻譯、寫入 runtime、掛鉤主行程入口，restore 100% 還原', async () => {
+    const { asarPath, target } = await makeElectronApp();
+    const before = fs.readFileSync(asarPath);
+    const r = await applyTarget(target, { lang: 'zh-TW', dict: dictApp, toolHome: home, toolVersion: '1.2.3' });
+    expect(r.status).toBe('applied');
+
+    expect(read(asarPath, 'dist/menu.js')).toBe(`Menu.buildFromTemplate([{label:"設定"},{label:"檢查更新",click:check}]);`);
+    expect(read(asarPath, 'dist/updater.js')).toBe(`dialog.showMessageBox({message:"有可用的更新",buttons:["立即重新啟動","稍後"]});`);
+    expect(read(asarPath, 'dist/tray.js')).toBe(`tray.setToolTip("開啟 Antigravity");if(mode==="Later"){}`);
+    expect(read(asarPath, 'dist/preload.js')).toBe(`contextBridge.exposeInMainWorld("x",{});`);
+    // __mocks__ 不翻譯
+    expect(read(asarPath, 'dist/__mocks__/electron.js')).toBe(`module.exports={menu:{label:"Settings"}};`);
+
+    const main = read(asarPath, 'dist/main.js');
+    expect(main.startsWith(`'use strict';\n${HOOK_BEGIN}`)).toBe(true);
+    expect(main.endsWith(MAIN_CJS.slice(`'use strict';\n`.length))).toBe(true);
+    expect(main.split(HOOK_BEGIN)).toHaveLength(2);
+
+    const runtime = read(asarPath, `dist/${RUNTIME_FILE_NAME}`);
+    expect(runtime.startsWith(RUNTIME_MARKER)).toBe(true);
+    expect(runtime).toContain('"Restart Now":"立即重新啟動"');
+    expect(runtime).toContain('(zh-TW)');
+
+    const m = readManifest(r.manifestPath)!;
+    expect(m.runtime).toEqual({ entries: 8, mainEntry: 'dist/main.js', runtimeFile: `dist/${RUNTIME_FILE_NAME}` });
+
+    const res = await restoreManifest(r.manifestPath, { toolHome: home });
+    expect(res.status).toBe('restored');
+    expect(fs.readFileSync(asarPath)).toEqual(before);
+    expect(electronAsarArchiver.list(asarPath).some((e) => e.path.endsWith(RUNTIME_FILE_NAME))).toBe(false);
+  });
+
+  it('--force 切換語系時以原始檔重建，不會重複注入', async () => {
+    const { asarPath, target } = await makeElectronApp();
+    await applyTarget(target, { lang: 'zh-TW', dict: dictApp, toolHome: home });
+    const dictCNApp = { ...dictApp, Settings: '设置' };
+    const r = await applyTarget(target, { lang: 'zh-CN', dict: dictCNApp, toolHome: home, force: true });
+    expect(r.status).toBe('applied');
+    expect(read(asarPath, 'dist/main.js').split(HOOK_BEGIN)).toHaveLength(2);
+    expect(read(asarPath, `dist/${RUNTIME_FILE_NAME}`)).toContain('"Settings":"设置"');
+    expect(read(asarPath, 'dist/menu.js')).toContain('label:"设置"');
+  });
+
+  it('原始 main 已含舊注入標記時先移除再注入', async () => {
+    const { asarPath, target } = await makeElectronApp();
+    const fake: AsarArchiver = {
+      ...electronAsarArchiver,
+      readFile: (a, p) => {
+        const buf = electronAsarArchiver.readFile(a, p);
+        return p === 'dist/main.js' ? Buffer.from(`${HOOK_BEGIN}\nold();\n/* antigravity-i18n:runtime-hook:end */\n${buf.toString()}`) : buf;
+      },
+    };
+    const r = await applyTarget(target, { lang: 'zh-TW', dict: dictApp, toolHome: home, archiver: fake });
+    expect(r.warnings.some((w) => w.includes('舊的 antigravity-i18n 注入標記'))).toBe(true);
+    const main = read(asarPath, 'dist/main.js');
+    expect(main).not.toContain('old();');
+    expect(main.split(HOOK_BEGIN)).toHaveLength(2);
+  });
+
+  it('runtime: false（--no-runtime）只套用靜態層', async () => {
+    const { asarPath, target } = await makeElectronApp();
+    const r = await applyTarget(target, { lang: 'zh-TW', dict: dictApp, toolHome: home, runtime: false });
+    expect(r.runtime).toMatchObject({ enabled: false, reason: '已以 --no-runtime 停用' });
+    expect(read(asarPath, 'dist/main.js')).toBe(MAIN_CJS);
+    expect(electronAsarArchiver.list(asarPath).some((e) => e.path.endsWith(RUNTIME_FILE_NAME))).toBe(false);
+    expect(readManifest(r.manifestPath)!.runtime).toBeUndefined();
+  });
+
+  it('package.json type=module 時使用 ESM 掛鉤', async () => {
+    const { asarPath, target } = await makeElectronApp({ type: 'module' });
+    const r = await applyTarget(target, { lang: 'zh-TW', dict: dictApp, toolHome: home });
+    expect(r.runtime?.format).toBe('esm');
+    const main = read(asarPath, 'dist/main.js');
+    expect(main.startsWith(HOOK_BEGIN)).toBe(true);
+    expect(main).toContain('import.meta.url');
+  });
+
+  it('CLI dry-run 輸出清楚區分兩層', async () => {
+    const { target } = await makeElectronApp();
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      lines.push(args.join(' ').replace(/\x1b\[[0-9;]*m/g, ''));
+    });
+    const prev = process.env.ANTIGRAVITY_I18N_HOME;
+    process.env.ANTIGRAVITY_I18N_HOME = home;
+    try {
+      const code = await applyCommand({ lang: 'zh-TW', target: 'app', path: target.installRoot, dryRun: true });
+      expect(code).toBe(0);
+    } finally {
+      spy.mockRestore();
+      if (prev === undefined) delete process.env.ANTIGRAVITY_I18N_HOME;
+      else process.env.ANTIGRAVITY_I18N_HOME = prev;
+    }
+    const out = lines.join('\n');
+    expect(out).toMatch(/靜態層：命中 \d+\/\d+ 條詞彙/);
+    expect(out).toMatch(/執行期注入層：將隨 runtime 載入 \d+ 條詞彙，其中 \d+ 條含佔位符，掛載於 dist\/main\.js（cjs）/);
+    expect(out).toContain('[靜態] dist/menu.js');
+    expect(out).toContain('[掛鉤] dist/main.js');
+    expect(out).toContain(`[新增] dist/${RUNTIME_FILE_NAME}`);
+    expect(out).toContain('dry-run 模式，未修改任何檔案');
+    expect(fs.existsSync(home)).toBe(false);
   });
 });
