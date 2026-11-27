@@ -68,5 +68,9 @@
   "Close": "關閉",
   "OK": "確定",
   "Cancel": "取消",
-  "Open": "開啟"
+  "Open": "開啟",
+  "Docs": "說明文件",
+  "Connect to WSL": "連線至 WSL",
+  "Reopen Locally": "在本機重新開啟",
+  "No updates available": "沒有可用的更新"
 }
