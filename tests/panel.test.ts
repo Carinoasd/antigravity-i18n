@@ -9,8 +9,8 @@ import { setPreset } from '../src/core/background.js';
 import { BACKGROUND_PRESETS, presetMeta } from '../src/core/presets.js';
 import { HOOK_VERSION, PANEL_MAX_BYTES, RUNTIME_FILE_NAME, buildRuntimeScript, injectHook } from '../src/core/runtime.js';
 import { applyBackground, type BackgroundPayload } from '../src/runtime/background.js';
-import { I18N_DISABLED_KEY, type OverlayHandle } from '../src/runtime/overlay.js';
-import { antigravityI18nPanel, type PanelHandle } from '../src/runtime/panel.js';
+import { I18N_DISABLED_KEY, antigravityI18nOverlay, type OverlayHandle } from '../src/runtime/overlay.js';
+import { MISSING_TRANSLATION_URL, SCAN_MAX_LEN, antigravityI18nPanel, type PanelHandle } from '../src/runtime/panel.js';
 import { rm, tmpDir, write } from './helpers.js';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 7, 7]);
@@ -524,5 +524,166 @@ describe('端對端：模擬 Electron 掛鉤注入面板', () => {
     expect(win.document.getElementById('antigravity-i18n-bg')).toBeNull();
     (win.document.querySelector('[data-agi18n-preset="forest"]') as HTMLButtonElement).click();
     expect(win.document.getElementById('antigravity-i18n-bg')!.getAttribute('data-preset')).toBe('forest');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 掃描本頁未翻譯英文
+// ─────────────────────────────────────────────────────────────
+
+describe('介面面板：掃描未翻譯英文', () => {
+  const PAGE = `
+    <main id="app">
+      <h1>Settings</h1>
+      <button id="new" title="Open the agent manager" aria-label="Start a new conversation">Start new chat</button>
+      <span>Start new chat</span>
+      <p>   Build   me a   web app   </p>
+      <div>已翻譯的 Agent 設定</div>
+      <div>12,345.67 %</div>
+      <div>x</div>
+      <div>https://antigravity.google/docs</div>
+      <div>someone@example.com</div>
+      <div>C:\\Users\\me\\Pictures\\bg.png</div>
+      <div>/home/me/project/src/main.ts</div>
+      <div>src/core/runtime.ts</div>
+      <div>package.json</div>
+      <div>Ctrl+Alt+B</div>
+      <div>Accept/Reject</div>
+      <div>${'Long sentence '.repeat(10)}</div>
+      <div hidden>Hidden by attribute</div>
+      <div style="display:none">Hidden by style</div>
+      <div aria-hidden="true">Decorative text</div>
+      <code>const fooBar = 1</code>
+      <pre>npm run build</pre>
+      <kbd>Shift</kbd><samp>Sample output</samp>
+      <svg><text>Svg label</text></svg>
+      <div class="monaco-editor"><span>editor line</span></div>
+      <div class="xterm"><span>terminal prompt</span></div>
+      <div contenteditable="true">user draft text</div>
+      <div contenteditable="false">Not editable label</div>
+      <div role="textbox">textbox content</div>
+      <div class="markdown"><p>Markdown answer</p></div>
+      <div class="markdown-body"><p>Body answer</p></div>
+      <div class="prose"><p>Prose answer</p></div>
+      <div class="ChatMarkdownRenderer"><p>Renderer answer</p></div>
+      <div data-antigravity-i18n-skip><p>Skipped area</p></div>
+      <input value="Typed secret value" placeholder="Search files by name" title="Search box">
+      <textarea placeholder="Type a message">Draft message body</textarea>
+      <select aria-label="Choose model"><option>Gemini Pro option</option></select>
+    </main>`;
+
+  it('只列出可見、未翻譯的英文介面字串與提示屬性（去重、排序），跳過保護區與表單內容', async () => {
+    const b = await boot({ i18n: true, html: PAGE });
+    const found = b.panel.scan();
+    expect(found).toEqual(
+      [
+        'Accept/Reject',
+        'Build me a web app',
+        'Choose model',
+        'Not editable label',
+        'Open the agent manager',
+        'Search box',
+        'Search files by name',
+        'Start a new conversation',
+        'Start new chat',
+        'Type a message',
+      ].sort(),
+    );
+    // 已翻譯（含中日韓文字）的字串不列入
+    expect(found.join('\n')).not.toMatch(/Settings|Agent 設定/);
+  });
+
+  it('詞庫已有對應（translate 不為 null）的英文不列入，即使尚未被 overlay 替換', async () => {
+    const b = await boot({ i18n: true, html: '<main id="app"></main>' });
+    const span = b.doc.createElement('span');
+    span.textContent = 'Appearance';
+    const other = b.doc.createElement('span');
+    other.textContent = 'Brand new label';
+    b.$('#app').append(span, other);
+    // 同步掃描：MutationObserver 尚未翻譯新節點
+    expect(span.textContent).toBe('Appearance');
+    expect(b.panel.scan()).toEqual(['Brand new label']);
+  });
+
+  it('與 overlay.ts 的保護區清單逐字相同', () => {
+    const extract = (src: string): string => {
+      const m = /const PROTECTED = \[([\s\S]*?)\]\.join\(/.exec(src);
+      if (!m?.[1]) throw new Error('PROTECTED not found');
+      return m[1].replace(/\s+/g, '');
+    };
+    expect(extract(antigravityI18nPanel.toString())).toBe(extract(antigravityI18nOverlay.toString()));
+    for (const sel of ['code', 'pre', 'kbd', 'samp', 'script', 'style', 'svg', '.monaco-editor', '.xterm', '[contenteditable]', '[role="textbox"]', '.markdown', '.markdown-body', '.prose', '[class*="markdown"]', '[class*="Markdown"]', '[data-antigravity-i18n-skip]']) {
+      expect(extract(antigravityI18nPanel.toString())).toContain(sel.replace(/\s+/g, ''));
+    }
+  });
+
+  it('面板按鈕：顯示筆數與預覽、複製 JSON（navigator.clipboard），GitHub 回報連結安全開新視窗', async () => {
+    const b = await boot({ i18n: true, html: '<main id="app"><button>Run all tests</button><span>Open <b>in</b> editor</span></main>' });
+    const writes: string[] = [];
+    Object.defineProperty(b.win.navigator, 'clipboard', { value: { writeText: vi.fn(async (t: string) => void writes.push(t)) }, configurable: true });
+    key(b, ctrlAltB);
+    const copy = b.$('[data-agi18n="scan-copy"]') as HTMLButtonElement;
+    expect(copy.disabled).toBe(true);
+    b.$('[data-agi18n="scan"]').click();
+    expect(b.$('[data-agi18n="scan-count"]').textContent).toBe('找到 4 筆');
+    const items = Array.from(b.doc.querySelectorAll('[data-agi18n="scan-list"] li')).map((li) => li.textContent);
+    expect(items).toEqual(['Open', 'Run all tests', 'editor', 'in']);
+    // 預覽一律以 textContent 寫入
+    expect(b.$('[data-agi18n="scan-list"]').innerHTML).not.toContain('<b>');
+    expect(copy.disabled).toBe(false);
+    copy.click();
+    await sleep(0);
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(writes[0]!)).toEqual({ Open: '', 'Run all tests': '', editor: '', in: '' });
+    expect(b.panel.scanJson()).toBe(writes[0]);
+    expect(b.$('[data-agi18n="msg"]').textContent).toContain('已複製 4 筆');
+
+    const link = b.$('[data-agi18n="scan-report"]') as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe(MISSING_TRANSLATION_URL);
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    // 面板自己的文字不會被掃描到
+    expect(b.panel.scan()).not.toContain('掃描本頁');
+  });
+
+  it('剪貼簿 API 失敗時改用 textarea + execCommand，失敗也不拋錯', async () => {
+    const b = await boot({ i18n: true, html: '<main id="app"><button>Deploy now</button></main>' });
+    Object.defineProperty(b.win.navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('denied')) }, configurable: true });
+    let copied = '';
+    (b.doc as unknown as { execCommand: (c: string) => boolean }).execCommand = (c: string) => {
+      copied = (b.doc.activeElement as HTMLTextAreaElement | null)?.value ?? '';
+      return c === 'copy';
+    };
+    key(b, ctrlAltB);
+    b.$('[data-agi18n="scan"]').click();
+    b.$('[data-agi18n="scan-copy"]').click();
+    await sleep(0);
+    expect(JSON.parse(copied)).toEqual({ 'Deploy now': '' });
+    expect(b.doc.querySelector('textarea')).toBeNull();
+    expect(b.$('[data-agi18n="msg"]').textContent).toContain('已複製 1 筆');
+
+    (b.doc as unknown as { execCommand: () => boolean }).execCommand = () => {
+      throw new Error('nope');
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    b.$('[data-agi18n="scan-copy"]').click();
+    await sleep(0);
+    expect(b.$('[data-agi18n="msg"]').textContent).toContain('無法存取剪貼簿');
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('僅背景模式（沒有翻譯層）：列出本頁所有英文並提示', async () => {
+    const b = await boot({ html: '<main id="app"><h1>Settings</h1><p>Agent Manager</p></main>' });
+    key(b, ctrlAltB);
+    b.$('[data-agi18n="scan"]').click();
+    expect(b.panel.scan()).toEqual(['Agent Manager', 'Settings']);
+    expect(b.$('[data-agi18n="msg"]').textContent).toContain('僅背景模式');
+  });
+
+  it('掛鉤內嵌的面板含掃描工具；常數與面板內的字面值一致', () => {
+    const src = antigravityI18nPanel.toString();
+    expect(src).toContain(MISSING_TRANSLATION_URL);
+    expect(src).toContain(`MAX_LEN = ${SCAN_MAX_LEN}`);
+    expect(HOOK_VERSION).toBe(5);
   });
 });
