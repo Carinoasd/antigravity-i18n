@@ -684,6 +684,6 @@ describe('介面面板：掃描未翻譯英文', () => {
     const src = antigravityI18nPanel.toString();
     expect(src).toContain(MISSING_TRANSLATION_URL);
     expect(src).toContain(`MAX_LEN = ${SCAN_MAX_LEN}`);
-    expect(HOOK_VERSION).toBe(5);
+    expect(HOOK_VERSION).toBe(6);
   });
 });

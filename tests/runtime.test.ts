@@ -401,8 +401,8 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     expect(panels(wc)).toHaveLength(2);
   });
 
-  it('掛鉤 v5 內嵌完整的預設表與背景面板（含未翻譯掃描）', () => {
-    expect(HOOK_VERSION).toBe(5);
+  it('掛鉤 v6 內嵌完整的預設表與背景面板（含未翻譯掃描、收藏夾、外觀微調與五語切換）', () => {
+    expect(HOOK_VERSION).toBe(6);
     for (const format of ['cjs', 'esm'] as const) {
       const hook = buildHook(format);
       expect(hook).toContain(`/* antigravity-i18n:hook-version ${HOOK_VERSION} */`);

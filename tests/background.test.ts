@@ -990,11 +990,14 @@ describe('bg preset / presets 指令與掛鉤升級提示', () => {
       runtime: { entries: 1, mainEntry: 'dist/main.js', runtimeFile: 'dist/x.js', hookVersion: 2 },
     };
     writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), m);
-    expect(HOOK_VERSION).toBe(5);
-    expect(hookHint(home)).toMatch(/v2.*v5.*bg preset.*--tint.*Ctrl\+Alt\+B.*--force/);
-    // v4 只缺少「掃描未翻譯英文」工具
+    expect(HOOK_VERSION).toBe(6);
+    expect(hookHint(home)).toMatch(/v2.*v6.*bg preset.*--tint.*Ctrl\+Alt\+B.*--force/);
+    // v4 只缺少「掃描未翻譯英文」工具（以及 v6 的功能）
     writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), { ...m, runtime: { ...m.runtime!, hookVersion: 4 } });
-    expect(hookHint(home)).toMatch(/v4.*v5.*掃描未翻譯英文.*--force/);
+    expect(hookHint(home)).toMatch(/v4.*v6.*掃描未翻譯英文.*--force/);
+    // v5 缺少桌布收藏夾、外觀微調與五語即時切換
+    writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), { ...m, runtime: { ...m.runtime!, hookVersion: 5 } });
+    expect(hookHint(home)).toMatch(/v5.*v6.*桌布收藏夾.*五語即時切換.*--force/);
   });
 });
 

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { ApplyLang, DetectedTarget, Dictionary, Manifest, ManifestFile, ManifestFileRole, TargetId, TranslateStats } from '../types.js';
+import type { ApplyLang, DetectedTarget, Dictionary, Lang, Manifest, ManifestFile, ManifestFileRole, TargetId, TranslateStats } from '../types.js';
 import { electronAsarArchiver, type AsarArchiver, type AsarWriteEntry } from './asar.js';
 import {
   atomicCopy,
@@ -28,6 +28,8 @@ import {
   parsePackageJson,
   resolveMainEntry,
   runtimeEntryPath,
+  runtimeLangs,
+  type RuntimeDicts,
   type RuntimeLayerInfo,
 } from './runtime.js';
 import { Translator, emptyStats, mergeHits } from './translator.js';
@@ -48,6 +50,11 @@ export interface PatchContext {
   now?: Date;
   /** asar 目標是否啟用執行期 DOM 注入層（預設 true） */
   runtime?: boolean;
+  /**
+   * 其他語系的 runtime 詞庫：一併打包進 runtime，讓介面面板免重整切換五語。
+   * 未提供時 runtime 只包含 apply 的語系（dict）。靜態層一律只使用 dict。
+   */
+  runtimeDicts?: RuntimeDicts;
 }
 
 export type ApplyStatus = 'applied' | 'dry-run' | 'already-applied' | 'unsupported' | 'no-match';
@@ -247,13 +254,14 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
             // 僅背景模式：不寫入翻譯 runtime，只靠掛鉤載入背景與介面面板
             runtime = { enabled: true, entries: 0, patternEntries: 0, mainEntry: main, format, translation: false };
           } else {
-            translated.set(runtimeFile, Buffer.from(buildRuntimeScript(ctx.dict, { lang: ctx.lang, version: ctx.toolVersion ?? '0.0.0' }), 'utf8'));
+            const extra = ctx.runtimeDicts ?? {};
+            translated.set(runtimeFile, Buffer.from(buildRuntimeScript(ctx.dict, { lang: ctx.lang, version: ctx.toolVersion ?? '0.0.0' }, extra), 'utf8'));
             changes.push({ path: runtimeFile, kind: 'runtime', hits: 0 });
             if (!fileSet.has(runtimeFile)) {
               const at = writeList.findIndex((e) => e.path === main);
               writeList.splice(at + 1, 0, { path: runtimeFile, type: 'file', unpacked: false });
             }
-            runtime = { enabled: true, ...counts, mainEntry: main, runtimeFile, format, translation: true };
+            runtime = { enabled: true, ...counts, mainEntry: main, runtimeFile, format, translation: true, langs: runtimeLangs(ctx.dict, ctx.lang as Lang, extra) };
           }
         }
       }
@@ -404,6 +412,7 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
             ...(base.runtime.runtimeFile ? { runtimeFile: base.runtime.runtimeFile } : {}),
             hookVersion: HOOK_VERSION,
             translation: base.runtime.translation !== false,
+            ...(base.runtime.langs && base.runtime.langs.length > 1 ? { langs: base.runtime.langs } : {}),
           }
         : undefined,
     };

@@ -16,7 +16,7 @@ import {
 import { FileLockError, explainFsError } from '../core/errors.js';
 import { resolveLaunchTarget } from '../core/launcher.js';
 import { ShortcutError, defaultShortcutEnv, installShortcut, removeShortcut, shortcutStatus, type ShortcutEnv, type ShortcutResult } from '../core/shortcut.js';
-import { loadDictionary, normalizeLang } from '../core/locales.js';
+import { loadDictionary, loadRuntimeDicts, normalizeLang } from '../core/locales.js';
 import { applyTarget, inspectManifest, inspectTarget, restoreManifest, type ApplyStatus, type TargetState } from '../core/patcher.js';
 import { BACKGROUND_PRESETS } from '../core/presets.js';
 import { installRules, removeRules, rulesStatus, type RulesFileStatus } from '../core/rules.js';
@@ -235,7 +235,8 @@ export async function runApply(ctx: ActionContext, body: Record<string, unknown>
     }
     try {
       const dict = lang === 'none' ? {} : loadDictionary(lang as Lang, TARGET_MODULES[id]);
-      const r = await applyTarget(t, { lang, dict, toolHome: ctx.toolHome, dryRun, force, toolVersion: ctx.toolVersion, archiver: ctx.archiver });
+      const runtimeDicts = id === 'app' && lang !== 'none' ? loadRuntimeDicts(TARGET_MODULES.app) : undefined;
+      const r = await applyTarget(t, { lang, dict, toolHome: ctx.toolHome, dryRun, force, toolVersion: ctx.toolVersion, archiver: ctx.archiver, runtimeDicts });
       results.push({
         id,
         status: r.status,

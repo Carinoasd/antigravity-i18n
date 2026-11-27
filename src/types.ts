@@ -101,5 +101,7 @@ export interface Manifest {
     hookVersion?: number;
     /** 是否載入翻譯 runtime；舊版 manifest 沒有此欄位，視為 true */
     translation?: boolean;
+    /** runtime 內打包的語系（多於一個時才記錄；舊版 manifest 沒有此欄位，只有 lang） */
+    langs?: Lang[];
   };
 }

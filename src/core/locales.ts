@@ -98,6 +98,11 @@ export function loadDictionary(lang: Lang, modules: readonly LocaleModule[], dir
   return out;
 }
 
+/** 四個語系的詞庫（打包進 app 的多語系 runtime，讓介面面板可以免重整切換） */
+export function loadRuntimeDicts(modules: readonly LocaleModule[], dir = defaultLocalesDir()): Record<Lang, Dictionary> {
+  return Object.fromEntries(LANGS.map((l) => [l, loadDictionary(l, modules, dir)])) as Record<Lang, Dictionary>;
+}
+
 export function loadProtectedTerms(dir = defaultLocalesDir()): string[] {
   const file = path.join(dir, 'protected-terms.json');
   const data = readJson(file) as ProtectedTermsFile;
