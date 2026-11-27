@@ -41,5 +41,9 @@
   "Command Palette": "命令選擇區",
   "Show All Commands": "顯示所有命令",
   "MCP Servers": "MCP 伺服器",
-  "Manage MCP Servers": "管理 MCP 伺服器"
+  "Manage MCP Servers": "管理 MCP 伺服器",
+  "Application": "應用程式",
+  "Shortcuts": "快速鍵",
+  "Not in Project": "未在專案中",
+  "Give Feedback": "提供意見回饋"
 }
