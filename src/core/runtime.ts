@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { applyBackground, readBackgroundPayload } from '../runtime/background.js';
 import { antigravityI18nOverlay, type OverlayOptions } from '../runtime/overlay.js';
 import type { Dictionary } from '../types.js';
 
@@ -11,6 +12,9 @@ import type { Dictionary } from '../types.js';
  *    插入一小段掛鉤，於 `web-contents-created` → `dom-ready` 時以
  *    `webContents.executeJavaScript()` 注入 runtime。
  *
+ * 3. 同一個掛鉤也負責自訂背景圖：每次 `dom-ready` 讀取 `background.json`，
+ *    所以換圖不需要重新打包 app.asar。
+ *
  * 掛鉤前後有明確標記，可偵測與移除；還原則一律以原始 app.asar 備份覆蓋。
  */
 
@@ -18,6 +22,12 @@ export const RUNTIME_FILE_NAME = 'antigravity-i18n-runtime.js';
 export const HOOK_BEGIN = '/* antigravity-i18n:runtime-hook:begin */';
 export const HOOK_END = '/* antigravity-i18n:runtime-hook:end */';
 export const RUNTIME_MARKER = '/* antigravity-i18n:runtime */';
+/**
+ * 掛鉤版本：
+ * - 1：翻譯 runtime
+ * - 2：翻譯 runtime + 自訂背景圖
+ */
+export const HOOK_VERSION = 2;
 
 export type ModuleFormat = 'cjs' | 'esm';
 
@@ -92,12 +102,27 @@ export function isInternalUrl(url: string): boolean {
   return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
 }
 
+/** 將自足函式序列化，並把遞迴呼叫改成掛鉤內的變數名稱 */
+function inlineFn(fn: (...args: never[]) => unknown, name: string, as: string): string {
+  return fn
+    .toString()
+    .replace(new RegExp(`\\b${name}\\(`, 'g'), `${as}(`)
+    .replace(new RegExp(`^function ${as}\\(`), 'function (');
+}
+
 /** 主行程掛鉤共用邏輯（CJS / ESM 變體共用） */
 function installSource(): string {
-  return `var __agi18nIsInternalUrl = ${isInternalUrl.toString().replace(/\bisInternalUrl\(/g, '__agi18nIsInternalUrl(').replace(/^function __agi18nIsInternalUrl\(/, 'function (')};
-    function __agi18nInstall(app, code) {
-    if (!app || !code || globalThis.__ANTIGRAVITY_I18N_HOOK__) return;
-    globalThis.__ANTIGRAVITY_I18N_HOOK__ = true;
+  return `var __agi18nIsInternalUrl = ${inlineFn(isInternalUrl, 'isInternalUrl', '__agi18nIsInternalUrl')};
+    var __agi18nReadBg = ${inlineFn(readBackgroundPayload, 'readBackgroundPayload', '__agi18nReadBg')};
+    var __agi18nApplyBg = ${JSON.stringify(applyBackground.toString())};
+    function __agi18nInstall(app, code, readBg) {
+    if (!app || (!code && !readBg) || globalThis.__ANTIGRAVITY_I18N_HOOK__) return;
+    globalThis.__ANTIGRAVITY_I18N_HOOK__ = ${HOOK_VERSION};
+    var inject = function (wc, js, what) {
+      Promise.resolve(wc.executeJavaScript(js, true)).catch(function (err) {
+        console.warn('[antigravity-i18n] ' + what + ' inject failed:', err && err.message);
+      });
+    };
     app.on('web-contents-created', function (_event, wc) {
       var type = '';
       try { type = wc.getType(); } catch (e) {}
@@ -108,9 +133,13 @@ function installSource(): string {
         try { url = wc.getURL(); } catch (e) {}
         // 每次載入都重新判斷：視窗導向外部網站時不注入
         if (!__agi18nIsInternalUrl(url)) return;
-        Promise.resolve(wc.executeJavaScript(code, true)).catch(function (err) {
-          console.warn('[antigravity-i18n] runtime inject failed:', err && err.message);
-        });
+        if (code) inject(wc, code, 'runtime');
+        // 自訂背景圖：每次載入重新讀取設定，換圖不需重新打包；任何錯誤都不影響翻譯
+        if (readBg) {
+          var bg = null;
+          try { bg = readBg(); } catch (e) { console.warn('[antigravity-i18n] background:', e && e.message); }
+          if (bg) inject(wc, '(' + __agi18nApplyBg + ')(' + JSON.stringify(bg) + ');', 'background');
+        }
       });
     });
   }`;
@@ -119,18 +148,31 @@ function installSource(): string {
 /** 產生主行程掛鉤程式碼 */
 export function buildHook(format: ModuleFormat, runtimeFileName = RUNTIME_FILE_NAME): string {
   const file = JSON.stringify(`./${runtimeFileName}`);
+  const version = `/* antigravity-i18n:hook-version ${HOOK_VERSION} */`;
   if (format === 'esm') {
     return `${HOOK_BEGIN}
+${version}
 import * as __agi18nElectron from 'electron';
 import * as __agi18nFs from 'node:fs';
+import * as __agi18nOs from 'node:os';
+import * as __agi18nPath from 'node:path';
 import * as __agi18nUrl from 'node:url';
 ;(function () {
   try {
     if (process.env.ANTIGRAVITY_I18N_DISABLE === '1') return;
-    var pick = function (ns, name) { return ns[name] || (ns.default && ns.default[name]); };
+    var mod = function (ns) { return ns.default || ns; };
+    var electron = mod(__agi18nElectron);
+    var app = __agi18nElectron.app || electron.app;
+    var fs = mod(__agi18nFs), os = mod(__agi18nOs), path = mod(__agi18nPath);
     ${installSource()}
-    var file = pick(__agi18nUrl, 'fileURLToPath')(new URL(${file}, import.meta.url));
-    __agi18nInstall(pick(__agi18nElectron, 'app'), pick(__agi18nFs, 'readFileSync')(file, 'utf8'));
+    var code = '';
+    try {
+      code = fs.readFileSync(mod(__agi18nUrl).fileURLToPath(new URL(${file}, import.meta.url)), 'utf8');
+    } catch (e) {
+      console.warn('[antigravity-i18n] runtime not loaded:', e && e.message);
+    }
+    var bgCache = {};
+    __agi18nInstall(app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache); });
   } catch (e) {
     console.warn('[antigravity-i18n] runtime hook disabled:', e && e.message);
   }
@@ -139,12 +181,20 @@ ${HOOK_END}
 `;
   }
   return `${HOOK_BEGIN}
+${version}
 ;(function () {
   try {
     if (process.env.ANTIGRAVITY_I18N_DISABLE === '1') return;
     ${installSource()}
-    var file = require('path').join(__dirname, ${file});
-    __agi18nInstall(require('electron').app, require('fs').readFileSync(file, 'utf8'));
+    var fs = require('fs'), path = require('path'), os = require('os');
+    var code = '';
+    try {
+      code = fs.readFileSync(path.join(__dirname, ${file}), 'utf8');
+    } catch (e) {
+      console.warn('[antigravity-i18n] runtime not loaded:', e && e.message);
+    }
+    var bgCache = {};
+    __agi18nInstall(require('electron').app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache); });
   } catch (e) {
     console.warn('[antigravity-i18n] runtime hook disabled:', e && e.message);
   }

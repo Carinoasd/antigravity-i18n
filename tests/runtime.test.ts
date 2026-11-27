@@ -5,7 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HOOK_BEGIN,
   HOOK_END,
@@ -306,6 +306,7 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     return write(path.join(dir, 'dist', format === 'esm' ? 'main.mjs' : 'main.js'), injectHook(body, format));
   }
 
+  let prevHome: string | undefined;
   beforeEach(() => {
     dir = tmpDir();
     app = new EventEmitter();
@@ -313,12 +314,17 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     delete g.__ANTIGRAVITY_I18N_HOOK__;
     delete g.__mainRan;
     delete process.env.ANTIGRAVITY_I18N_DISABLE;
+    // 掛鉤會讀取背景圖設定：指向暫存目錄，避免讀到使用者真實的 ~/.antigravity-i18n
+    prevHome = process.env.ANTIGRAVITY_I18N_HOME;
+    process.env.ANTIGRAVITY_I18N_HOME = path.join(dir, 'tool-home');
   });
   afterEach(() => {
     rm(dir);
     delete g.__fakeElectronApp;
     delete g.__ANTIGRAVITY_I18N_HOOK__;
     delete process.env.ANTIGRAVITY_I18N_DISABLE;
+    if (prevHome === undefined) delete process.env.ANTIGRAVITY_I18N_HOME;
+    else process.env.ANTIGRAVITY_I18N_HOME = prevHome;
   });
 
   const exercise = (): { win: FakeWc; view: FakeWc; webview: FakeWc; devtools: FakeWc } => {
@@ -399,11 +405,16 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     expect(app.listenerCount('web-contents-created')).toBe(0);
   });
 
-  it('找不到 runtime 檔案時不影響 App 啟動', () => {
+  it('找不到 runtime 檔案時不影響 App 啟動，也不注入翻譯', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const main = makeApp('cjs');
     fs.rmSync(path.join(dir, 'dist', RUNTIME_FILE_NAME));
     expect(() => createRequire(main)(main)).not.toThrow();
     expect(g.__mainRan).toBe('function');
-    expect(app.listenerCount('web-contents-created')).toBe(0);
+    // 掛鉤仍會註冊（背景圖不依賴翻譯 runtime），但沒有可注入的翻譯腳本
+    const { win } = exercise();
+    expect(win.injected).toEqual([]);
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('runtime not loaded'))).toBe(true);
+    warn.mockRestore();
   });
 });

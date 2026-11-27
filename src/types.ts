@@ -86,5 +86,5 @@ export interface Manifest {
   files: ManifestFile[];
   stats: Omit<TranslateStats, 'hitsByKey'>;
   /** asar 目標的執行期注入層（未啟用時不存在） */
-  runtime?: { entries: number; mainEntry: string; runtimeFile: string };
+  runtime?: { entries: number; mainEntry: string; runtimeFile: string; hookVersion?: number };
 }
