@@ -347,6 +347,7 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     const resetBtn = el('button', { type: 'button', 'data-agi18n': 'reset' }, '重設（改回 CLI 設定）');
     const i18nBox = el('input', { type: 'checkbox', 'data-agi18n': 'i18n' });
     const i18nRow = el('label', { class: 'agi18n-row' });
+    const i18nTitle = el('div', { class: 'agi18n-sub' }, '語言');
     i18nRow.append(el('span', {}, '中文介面（取消勾選顯示英文）'), i18nBox);
     const msg = el('div', { class: 'agi18n-msg', 'data-agi18n': 'msg', 'aria-live': 'polite' });
     const foot = el('div', { class: 'agi18n-foot' }, 'Ctrl+Alt+B（macOS：⌘+⌥+B）開關．Esc 關閉');
@@ -367,7 +368,7 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       modeRow,
       el('div', { class: 'agi18n-row' }),
       resetBtn,
-      el('div', { class: 'agi18n-sub' }, '語言'),
+      i18nTitle,
       i18nRow,
       msg,
       foot,
@@ -397,6 +398,9 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       const ov = g.__ANTIGRAVITY_I18N__;
       i18nBox.disabled = !ov;
       i18nBox.checked = !!ov && ov.enabled !== false;
+      // 僅背景模式（--lang none）沒有翻譯層：隱藏中／英文切換
+      i18nRow.hidden = !ov;
+      i18nTitle.hidden = !ov;
     };
 
     /** 套用一次介面變更：立即重繪、同步控制項、排程寫入 IndexedDB */

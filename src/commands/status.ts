@@ -4,7 +4,7 @@ import { inspectManifest, inspectTarget } from '../core/patcher.js';
 import { rulesStatus } from '../core/rules.js';
 import { TARGET_IDS, TARGET_LABELS } from '../types.js';
 import { hookHint, printBackgroundStatus } from './bg.js';
-import { getToolHome, pct, resolveTargets, sym, userHome } from './common.js';
+import { getToolHome, langLabel, pct, resolveTargets, sym, userHome } from './common.js';
 
 export interface StatusOptions {
   path?: string;
@@ -53,15 +53,19 @@ export async function statusCommand(opts: StatusOptions = {}): Promise<number> {
     const m = st.manifest;
     const label =
       st.state === 'applied'
-        ? pc.green(`已套用 ${m.lang}`)
+        ? pc.green(`已套用 ${langLabel(m.lang)}`)
         : st.state === 'outdated'
-          ? pc.yellow(`部分失效（${m.lang}，偵測到檔案變更，可能為官方更新，建議重新 apply）`)
+          ? pc.yellow(`部分失效（${langLabel(m.lang)}，偵測到檔案變更，可能為官方更新，建議重新 apply）`)
           : pc.dim('已還原為原始版本（manifest 殘留）');
     console.log(`  ${sym.dot} 中文化：${label}`);
     console.log(`  ${sym.dot} 套用時間：${m.appliedAt}　工具版本：${m.toolVersion}`);
     console.log(`  ${sym.dot} ${m.runtime ? '靜態層' : ''}覆蓋率：${pct(m.stats.coverage)}（${m.stats.matchedKeys}/${m.stats.totalKeys} 條詞彙，共 ${m.stats.totalHits} 處）`);
     if (m.runtime) {
-      console.log(`  ${sym.dot} 執行期注入層：已啟用（${m.runtime.entries} 條詞彙，掛載於 ${m.runtime.mainEntry}，掛鉤 v${m.runtime.hookVersion ?? 1}）`);
+      if (m.runtime.translation === false) {
+        console.log(`  ${sym.dot} 執行期注入層：僅背景模式（背景與 Ctrl+Alt+B 面板，不載入翻譯；掛載於 ${m.runtime.mainEntry}，掛鉤 v${m.runtime.hookVersion ?? 1}）`);
+      } else {
+        console.log(`  ${sym.dot} 執行期注入層：已啟用（${m.runtime.entries} 條詞彙，掛載於 ${m.runtime.mainEntry}，掛鉤 v${m.runtime.hookVersion ?? 1}）`);
+      }
     } else if (m.kind === 'asar') {
       console.log(`  ${sym.dot} 執行期注入層：${pc.dim('未啟用')}`);
     }

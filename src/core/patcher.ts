@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { DetectedTarget, Dictionary, Lang, Manifest, ManifestFile, ManifestFileRole, TargetId, TranslateStats } from '../types.js';
+import type { ApplyLang, DetectedTarget, Dictionary, Manifest, ManifestFile, ManifestFileRole, TargetId, TranslateStats } from '../types.js';
 import { electronAsarArchiver, type AsarArchiver, type AsarWriteEntry } from './asar.js';
 import {
   atomicCopy,
@@ -36,7 +36,8 @@ import { Translator, emptyStats, mergeHits } from './translator.js';
 export const CONTENT_EXTS = ['.js', '.mjs', '.cjs', '.json', '.html', '.htm'];
 
 export interface PatchContext {
-  lang: Lang;
+  /** none：僅背景模式（只適用於 asar 目標，dict 應為空物件） */
+  lang: ApplyLang;
   dict: Dictionary;
   /** 工具資料目錄（存放 manifests / backups） */
   toolHome: string;
@@ -55,8 +56,8 @@ export interface ApplyResult {
   target: TargetId;
   installRoot: string;
   status: ApplyStatus;
-  lang: Lang;
-  previousLang?: Lang;
+  lang: ApplyLang;
+  previousLang?: ApplyLang;
   stats: TranslateStats;
   files: { path: string; hits: number; role: ManifestFileRole }[];
   warnings: string[];
@@ -152,6 +153,14 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
     if (t.reason) warnings.push(t.reason);
     return base;
   }
+  const backgroundOnly = ctx.lang === 'none';
+  if (backgroundOnly && t.kind !== 'asar') {
+    warnings.push('僅背景模式（--lang none）只適用於 app 目標');
+    return base;
+  }
+  if (backgroundOnly && ctx.runtime === false) {
+    throw new Error('僅背景模式（--lang none）需要主行程掛鉤，不能與 --no-runtime 一起使用');
+  }
 
   const existing = readManifest(manifestPath);
   const sources = new Map<string, SourceInfo>();
@@ -198,6 +207,8 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
       let asarHits = 0;
       // ── 靜態層：翻譯主行程原生選單、系統匣、更新提示、載入畫面等靜態字串 ──
       for (const e of entries) {
+        // 僅背景模式不做任何靜態翻譯
+        if (backgroundOnly) break;
         if (e.type !== 'file' || e.unpacked || !isAsarContent(e.path)) continue;
         const text = archiver.readFile(src.from, e.path).toString('utf8');
         const r = translator.translate(text, { filename: e.path });
@@ -227,18 +238,23 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
           const runtimeFile = runtimeEntryPath(main);
           const original = (translated.get(main) ?? archiver.readFile(src.from, main)).toString('utf8');
           if (hasHook(original)) warnings.push(`${main} 已含舊的 antigravity-i18n 注入標記，已移除後重新注入。`);
-          translated.set(main, Buffer.from(injectHook(original, format, RUNTIME_FILE_NAME), 'utf8'));
+          translated.set(main, Buffer.from(injectHook(original, format, RUNTIME_FILE_NAME, { translate: !backgroundOnly }), 'utf8'));
           const staticChange = changes.find((c) => c.path === main);
           if (staticChange) staticChange.kind = 'hook';
           else changes.push({ path: main, kind: 'hook', hits: 0 });
 
-          translated.set(runtimeFile, Buffer.from(buildRuntimeScript(ctx.dict, { lang: ctx.lang, version: ctx.toolVersion ?? '0.0.0' }), 'utf8'));
-          changes.push({ path: runtimeFile, kind: 'runtime', hits: 0 });
-          if (!fileSet.has(runtimeFile)) {
-            const at = writeList.findIndex((e) => e.path === main);
-            writeList.splice(at + 1, 0, { path: runtimeFile, type: 'file', unpacked: false });
+          if (backgroundOnly) {
+            // 僅背景模式：不寫入翻譯 runtime，只靠掛鉤載入背景與介面面板
+            runtime = { enabled: true, entries: 0, patternEntries: 0, mainEntry: main, format, translation: false };
+          } else {
+            translated.set(runtimeFile, Buffer.from(buildRuntimeScript(ctx.dict, { lang: ctx.lang, version: ctx.toolVersion ?? '0.0.0' }), 'utf8'));
+            changes.push({ path: runtimeFile, kind: 'runtime', hits: 0 });
+            if (!fileSet.has(runtimeFile)) {
+              const at = writeList.findIndex((e) => e.path === main);
+              writeList.splice(at + 1, 0, { path: runtimeFile, type: 'file', unpacked: false });
+            }
+            runtime = { enabled: true, ...counts, mainEntry: main, runtimeFile, format, translation: true };
           }
-          runtime = { enabled: true, ...counts, mainEntry: main, runtimeFile, format };
         }
       }
       base.runtime = runtime;
@@ -382,7 +398,13 @@ export async function applyTarget(t: DetectedTarget, ctx: PatchContext): Promise
       files: records,
       stats: { totalKeys: stats.totalKeys, matchedKeys: stats.matchedKeys, totalHits: stats.totalHits, coverage: stats.coverage },
       runtime: base.runtime?.enabled
-        ? { entries: base.runtime.entries, mainEntry: base.runtime.mainEntry!, runtimeFile: base.runtime.runtimeFile!, hookVersion: HOOK_VERSION }
+        ? {
+            entries: base.runtime.entries,
+            mainEntry: base.runtime.mainEntry!,
+            ...(base.runtime.runtimeFile ? { runtimeFile: base.runtime.runtimeFile } : {}),
+            hookVersion: HOOK_VERSION,
+            translation: base.runtime.translation !== false,
+          }
         : undefined,
     };
     writeManifest(manifestPath, manifest);

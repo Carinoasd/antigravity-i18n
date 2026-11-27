@@ -2,20 +2,32 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { backupsDir, manifestsDir } from '../config/paths.js';
+import { toFriendlyError } from './errors.js';
 import type { DetectedTarget, Manifest, TargetId } from '../types.js';
 
 export function sha256(data: Buffer | string): string {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
-/** 以串流計算檔案 SHA-256（適用於大型 asar） */
+/**
+ * 以串流計算檔案 SHA-256（適用於大型 asar）。
+ *
+ * 等到 `close`（而非 `end`）才 resolve：`end` 時檔案控制代碼可能還開著，
+ * Windows 上緊接著覆蓋或刪除同一個檔案（例如 rename 新的 app.asar）會失敗。
+ */
 export async function sha256File(file: string): Promise<string> {
   const hash = crypto.createHash('sha256');
   await new Promise<void>((resolve, reject) => {
+    let failed = false;
     fs.createReadStream(file)
       .on('data', (chunk) => hash.update(chunk))
-      .on('end', () => resolve())
-      .on('error', reject);
+      .on('error', (e) => {
+        failed = true;
+        reject(e);
+      })
+      .on('close', () => {
+        if (!failed) resolve();
+      });
   });
   return hash.digest('hex');
 }
@@ -44,13 +56,8 @@ export function atomicWrite(file: string, data: Buffer | string): void {
     } catch {
       /* ignore */
     }
-    const code = (e as NodeJS.ErrnoException).code;
-    if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') {
-      throw new Error(
-        `無法寫入 ${file}（${code}）。請先完全關閉 Antigravity，或以系統管理員 / sudo 權限重新執行。`,
-      );
-    }
-    throw e;
+    // EBUSY / EPERM / EACCES 轉成帶處理步驟的 FileLockError
+    throw toFriendlyError(e, file);
   }
 }
 
@@ -73,11 +80,7 @@ export function atomicCopy(src: string, dest: string): void {
     } catch {
       /* ignore */
     }
-    const code = (e as NodeJS.ErrnoException).code;
-    if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') {
-      throw new Error(`無法寫入 ${dest}（${code}）。請先完全關閉 Antigravity，或以系統管理員 / sudo 權限重新執行。`);
-    }
-    throw e;
+    throw toFriendlyError(e, dest);
   }
 }
 

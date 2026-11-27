@@ -34,6 +34,7 @@ import {
   setBackground,
   setBackgroundEnabled,
   setPreset,
+  sniffImage,
   validateImage,
   windowsToWslPath,
   wslToWindowsPath,
@@ -991,5 +992,18 @@ describe('bg preset / presets 指令與掛鉤升級提示', () => {
     writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), m);
     expect(HOOK_VERSION).toBe(4);
     expect(hookHint(home)).toMatch(/v2.*v4.*bg preset.*--tint.*Ctrl\+Alt\+B.*--force/);
+  });
+});
+
+describe('上傳圖片的格式判斷', () => {
+  it('以魔術位元組辨識 PNG / JPEG / GIF / WebP', () => {
+    expect(sniffImage(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]))).toEqual({ ext: 'png', mime: 'image/png' });
+    expect(sniffImage(Buffer.from([0xff, 0xd8, 0xff, 0xdb]))).toEqual({ ext: 'jpg', mime: 'image/jpeg' });
+    expect(sniffImage(Buffer.from('GIF89a....', 'latin1'))).toEqual({ ext: 'gif', mime: 'image/gif' });
+    expect(sniffImage(Buffer.from('RIFF\x00\x00\x00\x00WEBPVP8 ', 'latin1'))).toEqual({ ext: 'webp', mime: 'image/webp' });
+  });
+
+  it('其他內容一律拒絕', () => {
+    for (const bad of ['<svg/>', 'GIF90a', 'RIFF0000WAVE', '\x89PNG', '']) expect(sniffImage(Buffer.from(bad, 'latin1'))).toBeNull();
   });
 });

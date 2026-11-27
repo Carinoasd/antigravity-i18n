@@ -1,8 +1,9 @@
 import pc from 'picocolors';
+import { formatFsError } from '../core/errors.js';
 import { loadDictionary, readToolVersion } from '../core/locales.js';
 import { applyTarget, type ApplyResult } from '../core/patcher.js';
 import { TARGET_LABELS, TARGET_MODULES } from '../types.js';
-import { CliError, getToolHome, parseLang, parseTargets, pct, resolveTargets, sym, warn } from './common.js';
+import { CliError, getToolHome, langLabel, parseApplyLang, parseTargets, pct, resolveTargets, sym, warn } from './common.js';
 
 export interface ApplyOptions {
   lang?: string;
@@ -29,10 +30,16 @@ export function printSummary(r: ApplyResult): void {
   const s = r.stats;
   const dry = r.status === 'dry-run';
   const layer = r.runtime ? '靜態層' : '命中詞彙';
-  console.log(`  ${sym.dot} ${layer}：命中 ${s.matchedKeys}/${s.totalKeys} 條詞彙（覆蓋率 ${pc.bold(pct(s.coverage))}），共 ${s.totalHits} 處替換`);
+  if (r.lang === 'none') {
+    console.log(`  ${sym.dot} 靜態層：${pc.dim('僅背景模式，不做任何翻譯')}`);
+  } else {
+    console.log(`  ${sym.dot} ${layer}：命中 ${s.matchedKeys}/${s.totalKeys} 條詞彙（覆蓋率 ${pc.bold(pct(s.coverage))}），共 ${s.totalHits} 處替換`);
+  }
   if (r.runtime) {
     const rt = r.runtime;
-    if (rt.enabled) {
+    if (rt.enabled && rt.translation === false) {
+      console.log(`  ${sym.dot} 執行期注入層：${dry ? '將掛載' : '已掛載'}背景與 Ctrl+Alt+B 介面面板（不載入翻譯 runtime），掛載於 ${rt.mainEntry}（${rt.format}）`);
+    } else if (rt.enabled) {
       const pattern = rt.patternEntries > 0 ? `，其中 ${rt.patternEntries} 條含佔位符` : '';
       console.log(
         `  ${sym.dot} 執行期注入層：${dry ? '將隨' : '已隨'} runtime 載入 ${pc.bold(String(rt.entries))} 條詞彙${pattern}` +
@@ -55,18 +62,31 @@ export function printSummary(r: ApplyResult): void {
 }
 
 export async function applyCommand(opts: ApplyOptions): Promise<number> {
-  const lang = parseLang(opts.lang)!;
+  const lang = parseApplyLang(opts.lang);
   const { selector, ids } = parseTargets(opts.target);
+  if (lang === 'none' && selector !== 'all' && selector !== 'app') {
+    throw new CliError('僅背景模式（--lang none）只適用於 app 目標，請改用 --target app');
+  }
   const home = getToolHome();
   const toolVersion = readToolVersion();
   const resolved = resolveTargets(ids, opts.path);
 
-  console.log(pc.bold(`\n${opts.dryRun ? '預覽（dry-run）' : '套用'}中文化：${lang}\n`));
+  console.log(
+    pc.bold(
+      lang === 'none'
+        ? `\n${opts.dryRun ? '預覽（dry-run）' : '套用'}僅背景模式：只掛載背景與 Ctrl+Alt+B 介面面板，維持英文介面\n`
+        : `\n${opts.dryRun ? '預覽（dry-run）' : '套用'}中文化：${lang}\n`,
+    ),
+  );
 
   let failures = 0;
   let processed = 0;
   for (const { id, target } of resolved) {
     console.log(pc.bold(`■ ${id}  ${pc.dim(TARGET_LABELS[id])}`));
+    if (lang === 'none' && id !== 'app') {
+      console.log(`  ${pc.dim('僅背景模式只適用於 app，略過')}\n`);
+      continue;
+    }
     if (!target) {
       if (selector === 'all') {
         console.log(`  ${pc.dim('未偵測到安裝，略過')}\n`);
@@ -75,7 +95,7 @@ export async function applyCommand(opts: ApplyOptions): Promise<number> {
       throw new CliError(`找不到 ${TARGET_LABELS[id]} 的安裝位置，請以 --path 手動指定`);
     }
     console.log(`  ${sym.dot} 安裝路徑：${target.installRoot}`);
-    const dict = loadDictionary(lang, TARGET_MODULES[id]);
+    const dict = lang === 'none' ? {} : loadDictionary(lang, TARGET_MODULES[id]);
     let r: ApplyResult;
     try {
       r = await applyTarget(target, {
@@ -89,7 +109,8 @@ export async function applyCommand(opts: ApplyOptions): Promise<number> {
       });
     } catch (e) {
       failures++;
-      console.log(`  ${sym.fail} ${pc.red((e as Error).message)}\n`);
+      // EBUSY / EPERM / EACCES 會附上具體的處理步驟
+      console.log(`${formatFsError(e).split('\n').map((l, i) => (i === 0 ? `  ${sym.fail} ${pc.red(l)}` : `  ${l}`)).join('\n')}\n`);
       continue;
     }
     processed++;
@@ -101,8 +122,8 @@ export async function applyCommand(opts: ApplyOptions): Promise<number> {
         continue;
       case 'already-applied':
         console.log(
-          `  ${sym.info} 已套用過 ${r.previousLang}，為避免重複覆蓋已略過。` +
-            `${r.previousLang !== lang ? `切換為 ${lang} ` : '重新套用'}請加上 ${pc.bold('--force')}\n`,
+          `  ${sym.info} 已套用過 ${langLabel(r.previousLang ?? lang)}，為避免重複覆蓋已略過。` +
+            `${r.previousLang !== lang ? `切換為 ${langLabel(lang)} ` : '重新套用'}請加上 ${pc.bold('--force')}\n`,
         );
         continue;
       default:
@@ -120,7 +141,7 @@ export async function applyCommand(opts: ApplyOptions): Promise<number> {
 
   if (processed === 0 && failures === 0) {
     console.log(`${sym.warn} 沒有偵測到任何 Antigravity 安裝。可用 ${pc.bold('antigravity-i18n status')} 檢查，或以 --target 搭配 --path 手動指定。`);
-    console.log(`${sym.info} 也可以改用零侵入模式：${pc.bold(`antigravity-i18n rules install --lang ${lang}`)}\n`);
+    if (lang !== 'none') console.log(`${sym.info} 也可以改用零侵入模式：${pc.bold(`antigravity-i18n rules install --lang ${lang}`)}\n`);
     return 1;
   }
   return failures > 0 ? 1 : 0;

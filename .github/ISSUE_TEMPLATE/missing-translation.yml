@@ -1,0 +1,59 @@
+name: 缺少或錯誤的翻譯 / Missing or wrong translation
+description: 回報 Antigravity 介面上沒被翻譯、或翻譯不正確的文字
+title: "[翻譯] "
+labels: ["translation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝回報！英文原文必須與介面上顯示的**完全相同**（大小寫、標點、省略號），我們才能加進詞庫。
+        Thanks! Please copy the English text **exactly** as shown in the UI (case, punctuation, ellipsis).
+  - type: dropdown
+    id: target
+    attributes:
+      label: 出現在哪個產品 / Product
+      options:
+        - Antigravity App（桌面版）
+        - Antigravity IDE
+        - Antigravity CLI（agy）
+    validations:
+      required: true
+  - type: dropdown
+    id: lang
+    attributes:
+      label: 語系 / Language
+      multiple: true
+      options:
+        - zh-TW（繁體中文）
+        - zh-CN（简体中文）
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: 英文原文 / English source text
+      placeholder: "Accept All"
+    validations:
+      required: true
+  - type: input
+    id: current
+    attributes:
+      label: 目前顯示 / Currently shown
+      description: 沒被翻譯就填英文原文；翻錯就填目前的譯文
+  - type: input
+    id: suggestion
+    attributes:
+      label: 建議譯文 / Suggested translation
+      description: 請遵守 CONTRIBUTING.md 的用語規範（例如 zh-TW 用「設定」、zh-CN 用「设置」）
+  - type: textarea
+    id: location
+    attributes:
+      label: 出現在哪個畫面 / Where in the UI
+      description: 例如「設定 → 外觀」、「對話面板的按鈕」；可以附上截圖
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Antigravity 版本 / Antigravity version
+      placeholder: "2.35.2"

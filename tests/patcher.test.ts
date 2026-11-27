@@ -9,7 +9,7 @@ import { readManifest, sha256 } from '../src/core/backup.js';
 import { applyTarget, inspectTarget, restoreManifest, vscodeChecksum } from '../src/core/patcher.js';
 import { HOOK_BEGIN, HOOK_VERSION, RUNTIME_FILE_NAME, RUNTIME_MARKER } from '../src/core/runtime.js';
 import type { DetectedTarget, Dictionary } from '../src/types.js';
-import { rm, tmpDir, write } from './helpers.js';
+import { packAsar, rm, tmpDir, write } from './helpers.js';
 
 const dictTW: Dictionary = { Settings: '設定', Run: '執行', 'Accept All': '全部接受', 'Open Agent Manager': '開啟 Agent 管理員' };
 const dictCN: Dictionary = { Settings: '设置', Run: '运行', 'Accept All': '全部接受', 'Open Agent Manager': '打开 Agent 管理器' };
@@ -205,7 +205,7 @@ describe('App（app.asar）套用與還原', () => {
     const root = path.join(dir, withPlist ? 'Antigravity.app' : 'Antigravity App');
     const asarPath = withPlist ? path.join(root, 'Contents', 'Resources', 'app.asar') : path.join(root, 'resources', 'app.asar');
     fs.mkdirSync(path.dirname(asarPath), { recursive: true });
-    await asar.createPackageWithOptions(src, asarPath, { unpack: '*.node' });
+    await packAsar(src, asarPath, { unpack: '*.node' });
     if (withPlist) {
       const hash = electronAsarArchiver.headerHash(asarPath);
       write(
@@ -316,7 +316,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
     const root = path.join(dir, 'Antigravity2');
     const asarPath = path.join(root, 'resources', 'app.asar');
     fs.mkdirSync(path.dirname(asarPath), { recursive: true });
-    await asar.createPackageWithOptions(src, asarPath, {});
+    await packAsar(src, asarPath, {});
     const target = detectTarget('app', { customPath: root });
     if (!target) throw new Error('detect failed');
     return { asarPath, target };
@@ -342,6 +342,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
       mainEntry: 'dist/main.js',
       runtimeFile: `dist/${RUNTIME_FILE_NAME}`,
       format: 'cjs',
+      translation: true,
     });
     expect(r.asarEntries).toEqual([
       { path: 'dist/menu.js', kind: 'static', hits: 2 },
@@ -379,7 +380,7 @@ describe('App 雙層機制（靜態層 + 執行期注入層）', () => {
     expect(runtime).toContain('(zh-TW)');
 
     const m = readManifest(r.manifestPath)!;
-    expect(m.runtime).toEqual({ entries: 8, mainEntry: 'dist/main.js', runtimeFile: `dist/${RUNTIME_FILE_NAME}`, hookVersion: HOOK_VERSION });
+    expect(m.runtime).toEqual({ entries: 8, mainEntry: 'dist/main.js', runtimeFile: `dist/${RUNTIME_FILE_NAME}`, hookVersion: HOOK_VERSION, translation: true });
 
     const res = await restoreManifest(r.manifestPath, { toolHome: home });
     expect(res.status).toBe('restored');

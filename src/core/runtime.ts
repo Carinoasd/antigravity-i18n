@@ -49,8 +49,18 @@ export interface RuntimeLayerInfo {
   /** runtime 檔案（asar 內相對路徑） */
   runtimeFile?: string;
   format?: ModuleFormat;
+  /** 是否載入翻譯 runtime（僅背景模式為 false） */
+  translation?: boolean;
   /** 未啟用的原因 */
   reason?: string;
+}
+
+export interface HookOptions {
+  /**
+   * 是否讀取並注入翻譯 runtime（預設 true）。
+   * 僅背景模式（--lang none）為 false：不讀 runtime 檔，只負責背景與介面面板。
+   */
+  translate?: boolean;
 }
 
 const PLACEHOLDER_RE = /\{[A-Za-z_][A-Za-z0-9_]*\}|%[sd]/;
@@ -163,9 +173,10 @@ function installSource(): string {
 }
 
 /** 產生主行程掛鉤程式碼 */
-export function buildHook(format: ModuleFormat, runtimeFileName = RUNTIME_FILE_NAME): string {
+export function buildHook(format: ModuleFormat, runtimeFileName = RUNTIME_FILE_NAME, opts: HookOptions = {}): string {
   const file = JSON.stringify(`./${runtimeFileName}`);
-  const version = `/* antigravity-i18n:hook-version ${HOOK_VERSION} */`;
+  const translate = opts.translate !== false;
+  const version = `/* antigravity-i18n:hook-version ${HOOK_VERSION}${translate ? '' : ' background-only'} */`;
   if (format === 'esm') {
     return `${HOOK_BEGIN}
 ${version}
@@ -183,10 +194,14 @@ import * as __agi18nUrl from 'node:url';
     var fs = mod(__agi18nFs), os = mod(__agi18nOs), path = mod(__agi18nPath);
     ${installSource()}
     var code = '';
-    try {
+    ${
+      translate
+        ? `try {
       code = fs.readFileSync(mod(__agi18nUrl).fileURLToPath(new URL(${file}, import.meta.url)), 'utf8');
     } catch (e) {
       console.warn('[antigravity-i18n] runtime not loaded:', e && e.message);
+    }`
+        : '// 僅背景模式：不載入翻譯 runtime'
     }
     var bgCache = {};
     __agi18nInstall(app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache, __agi18nPresets); });
@@ -205,10 +220,14 @@ ${version}
     ${installSource()}
     var fs = require('fs'), path = require('path'), os = require('os');
     var code = '';
-    try {
+    ${
+      translate
+        ? `try {
       code = fs.readFileSync(path.join(__dirname, ${file}), 'utf8');
     } catch (e) {
       console.warn('[antigravity-i18n] runtime not loaded:', e && e.message);
+    }`
+        : '// 僅背景模式：不載入翻譯 runtime'
     }
     var bgCache = {};
     __agi18nInstall(require('electron').app, code, function () { return __agi18nReadBg(fs, path, os, process.env, process.platform, bgCache, __agi18nPresets); });
@@ -242,13 +261,13 @@ export function stripHook(code: string): string {
  * 在主行程入口最前面插入掛鉤，確保在 App 建立任何視窗之前就完成註冊。
  * 會保留 shebang 與 `'use strict'` 指示詞的位置（指示詞必須是第一個敘述）。
  */
-export function injectHook(code: string, format: ModuleFormat, runtimeFileName = RUNTIME_FILE_NAME): string {
+export function injectHook(code: string, format: ModuleFormat, runtimeFileName = RUNTIME_FILE_NAME, opts: HookOptions = {}): string {
   const clean = stripHook(code);
   const prologue = clean.match(/^(?:#![^\n]*\n)?(?:\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/))*\s*(["'])use strict\1;?[^\S\n]*\n?/);
   const shebang = clean.match(/^#![^\n]*\n/);
   const at = prologue ? prologue[0].length : shebang ? shebang[0].length : 0;
   const head = clean.slice(0, at);
-  return `${head}${head && !head.endsWith('\n') ? '\n' : ''}${buildHook(format, runtimeFileName)}${clean.slice(at)}`;
+  return `${head}${head && !head.endsWith('\n') ? '\n' : ''}${buildHook(format, runtimeFileName, opts)}${clean.slice(at)}`;
 }
 
 interface PackageJsonLike {

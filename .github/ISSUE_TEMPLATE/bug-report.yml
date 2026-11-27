@@ -1,0 +1,67 @@
+name: 問題回報 / Bug report
+description: 套用、還原、背景或控制台發生錯誤
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        回報前請先確認已**完全關閉 Antigravity**（含系統匣圖示 → Quit），並以最新版本重試。
+        Please quit Antigravity completely (including the tray icon) and retry with the latest version first.
+        ⚠️ 請勿貼上任何 Token、帳號資訊或私人檔案路徑中的敏感內容。Do not paste tokens or private information.
+  - type: textarea
+    id: what
+    attributes:
+      label: 發生了什麼 / What happened
+      description: 你做了什麼、預期結果、實際結果
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重現步驟 / Steps to reproduce
+      placeholder: |
+        1. antigravity-i18n apply --lang zh-TW --target app
+        2. 重新開啟 Antigravity
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: "`antigravity-i18n status` 的輸出 / Output of `antigravity-i18n status`"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: 錯誤訊息全文 / Full error output
+      render: text
+  - type: dropdown
+    id: os
+    attributes:
+      label: 作業系統 / OS
+      options:
+        - Windows
+        - Windows + WSL
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: 版本 / Versions
+      description: Antigravity 版本、antigravity-i18n 版本（`antigravity-i18n --version`）、Node.js 版本（`node -v`）
+      placeholder: "Antigravity 2.35.2 / antigravity-i18n 0.1.0 / Node 22.12.0"
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 確認事項 / Checklist
+      options:
+        - label: 我已完全關閉 Antigravity 後重試 / I quit Antigravity completely and retried
+          required: true
+        - label: 我已確認 `restore` 可以還原官方原版 / I checked that `restore` brings back the official build
