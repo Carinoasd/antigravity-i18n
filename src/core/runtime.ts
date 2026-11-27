@@ -120,7 +120,9 @@ export function isInternalUrl(url: string): boolean {
 }
 
 /** 將自足函式序列化，並把遞迴呼叫改成掛鉤內的變數名稱 */
-function inlineFn(fn: (...args: never[]) => unknown, name: string, as: string): string {
+function inlineFn(fn: (...args: never[]) => unknown, as: string): string {
+  // 以 fn.name 取得實際名稱：esbuild 打包時可能為避免衝突而改名（例如 isInternalUrl2）
+  const name = fn.name;
   return fn
     .toString()
     .replace(new RegExp(`\\b${name}\\(`, 'g'), `${as}(`)
@@ -129,8 +131,8 @@ function inlineFn(fn: (...args: never[]) => unknown, name: string, as: string): 
 
 /** 主行程掛鉤共用邏輯（CJS / ESM 變體共用） */
 function installSource(): string {
-  return `var __agi18nIsInternalUrl = ${inlineFn(isInternalUrl, 'isInternalUrl', '__agi18nIsInternalUrl')};
-    var __agi18nReadBg = ${inlineFn(readBackgroundPayload, 'readBackgroundPayload', '__agi18nReadBg')};
+  return `var __agi18nIsInternalUrl = ${inlineFn(isInternalUrl, '__agi18nIsInternalUrl')};
+    var __agi18nReadBg = ${inlineFn(readBackgroundPayload, '__agi18nReadBg')};
     var __agi18nApplyBg = ${JSON.stringify(applyBackground.toString())};
     var __agi18nPresets = ${JSON.stringify(presetImages())};
     var __agi18nPanel = ${JSON.stringify(antigravityI18nPanel.toString())};
