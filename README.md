@@ -336,7 +336,13 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --tint none   # 移除遮罩
 
 面板與背景圖層都帶有 `data-antigravity-i18n-skip`，不會被翻譯 runtime 處理。只想停用面板、保留 CLI 背景時，以 `ANTIGRAVITY_I18N_NO_PANEL=1` 啟動 Antigravity。
 
-前置條件：背景圖與面板由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤（目前為 v4：v2 支援圖片，v3 加上預設與遮罩，v4 加上介面內背景面板）；`bg status` 與 `status` 會提示目前狀態。
+**掃描本頁未翻譯英文**：面板最下方按「掃描本頁」，會列出目前畫面上仍是英文、詞庫還沒有對應的介面字串（含 `title` / `placeholder` / `aria-label` 提示文字）：
+
+- 跳過與翻譯 runtime 相同的保護區（程式碼、編輯器、終端機、可編輯區域、AI 回覆的 Markdown 正文）與表單欄位內容，也不會讀取你輸入的文字
+- 略過純數字／符號、網址、Email、檔案路徑、快捷鍵、超過 120 字元的長段落，以及已含中日韓文字的字串
+- 「**複製 JSON**」輸出 `{ "Original Text": "" }` 格式（可直接貼進詞庫補上譯文）；「**前往 GitHub 回報**」開啟缺少翻譯的 issue 範本
+
+前置條件：背景圖與面板由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤（目前為 v5：v2 支援圖片，v3 加上預設與遮罩，v4 加上介面內背景面板，v5 加上未翻譯掃描）；`bg status` 與 `status` 會提示目前狀態，透過 `launch` 啟動時也會自動升級。
 
 **WSL**：Windows 版 Antigravity 讀的是 Windows 家目錄下的 `C:\Users\<你>\.antigravity-i18n\background.json`。在 WSL 中執行 `bg` 指令時會：
 
@@ -348,6 +354,43 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --tint none   # 移除遮罩
 ```bash
 antigravity-i18n bg set /mnt/c/Users/me/Pictures/wallpaper.jpg --opacity 0.15 --blur 2
 ```
+
+### `launch`（智慧啟動器）與 `shortcut`（桌面捷徑）
+
+Antigravity 自動更新後會整個覆蓋 `app.asar`，在地化就消失了。`launch` 在**你開啟 Antigravity 的那一刻**檢查一次，必要時自動重新套用，然後啟動 Antigravity 並立即結束——**不常駐任何背景程式（0 MB 記憶體）**。
+
+```bash
+antigravity-i18n launch                    # 沿用上次套用的語系
+antigravity-i18n launch --lang zh-CN       # 重新套用時改用簡體中文
+antigravity-i18n launch --no-reapply       # 只啟動，不檢查
+
+antigravity-i18n shortcut install          # 在桌面建立指向 launch 的捷徑
+antigravity-i18n shortcut install --name "Antigravity 中文版" --lang zh-TW
+antigravity-i18n shortcut status
+antigravity-i18n shortcut remove
+```
+
+`launch` 的判斷：
+
+| 狀況 | 動作 |
+| --- | --- |
+| `app.asar` 的 SHA-256 與上次修補後相同、掛鉤為最新版 | 直接啟動（以檔案大小＋修改時間快取雜湊，毫秒級跳過） |
+| SHA-256 不同（官方剛自動更新）、掛鉤為舊版，或 `--lang` 指定了不同語系 | 以新版檔案為原始檔重新備份後套用，再啟動 |
+| Antigravity 已在執行、檔案被鎖定（`EBUSY` / `EPERM`） | 印出提示、略過本次重新套用，照常啟動；關閉 Antigravity 後再從捷徑開一次即可 |
+| 沒有套用紀錄（從未 apply 或已 restore） | 直接啟動，不做任何修改 |
+
+`shortcut` 只建立「執行一次 `launch`」的捷徑，移除捷徑就完全移除：
+
+| 平台 | 產物 |
+| --- | --- |
+| Windows | 桌面 `.lnk`：Antigravity 圖示、最小化執行（不會閃黑窗）；單檔執行檔與 `node dist/cli.js` 皆可 |
+| WSL | 偵測到 Windows 側 Antigravity 時，在 Windows 桌面建立 `.lnk`，透過 `wsl.exe -d <發行版> -- … launch` 執行 |
+| macOS | `~/Desktop/<名稱>.command`（可執行腳本） |
+| Linux | `~/.local/share/applications/antigravity-i18n.desktop`（應用程式選單） |
+
+選項：`--name`（顯示名稱，預設 `Antigravity (i18n)`）、`--lang`、`--path`（同時傳給 `launch`）、`--dir`（捷徑所在目錄）、`--force`（覆蓋或移除非本工具建立的同名檔案）。Windows 捷徑以 PowerShell `WScript.Shell` 建立，路徑與參數一律透過環境變數傳入固定腳本，不做字串拼接。圖形控制台也有「桌面捷徑」區塊可一鍵建立／移除。
+
+> 透過 `npx` 執行時，捷徑會指向 npx 的暫存快取，快取被清除後會失效；建議改用單檔執行檔或 `npm install -g antigravity-i18n` 後再建立捷徑。
 
 ### `validate`
 
@@ -534,13 +577,15 @@ src/
 │   ├── runtime.ts         # 執行期注入層：產生 runtime 腳本與主行程掛鉤
 │   ├── background.ts      # 背景圖設定：驗證、WSL 路徑轉換與鏡像
 │   ├── presets.ts         # 內建純 CSS 漸層預設（唯一來源，內嵌進掛鉤）
+│   ├── launcher.ts        # 智慧啟動器：偵測更新、重新套用、跨平台啟動
+│   ├── shortcut.ts        # 跨平台桌面捷徑（.lnk / .command / .desktop）
 │   └── rules.ts           # 全域規則
 ├── runtime/
 │   ├── overlay.ts         # 注入 renderer 的 DOM 翻譯 runtime（零依賴、自足）
 │   ├── background.ts      # 背景圖：主行程讀取設定 + renderer 注入圖層（皆序列化進掛鉤）
-│   └── panel.ts           # 介面內背景設定面板（Ctrl+Alt+B、IndexedDB 持久化）
+│   └── panel.ts           # 介面內背景設定面板（Ctrl+Alt+B、IndexedDB 持久化、未翻譯掃描）
 ├── ui/                    # 本機圖形控制台（server.ts、html.ts、actions.ts，零相依套件）
-└── commands/              # status / apply / restore / rules / bg / ui / validate
+└── commands/              # status / apply / restore / rules / bg / launch / shortcut / ui / validate
 locales/                   # 詞庫（zh-TW、zh-CN 各 7 個模組）
 tests/                     # vitest 單元測試
 ```
