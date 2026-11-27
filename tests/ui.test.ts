@@ -218,8 +218,13 @@ function request(srv: UiServer, opts: { method?: string; path?: string; headers?
     const data = opts.body === undefined ? undefined : typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
     const headers: Record<string, string> = { Host: opts.host ?? `${UI_HOST}:${srv.port}`, ...(opts.headers ?? {}) };
     if (opts.token !== null) headers['X-AGI18N-Token'] = opts.token ?? srv.token;
-    if (data !== undefined) headers['Content-Type'] = 'application/json';
-    const req = http.request({ host: UI_HOST, port: srv.port, method: opts.method ?? 'GET', path: opts.path ?? '/', headers }, (res) => {
+    if (data !== undefined) {
+      // 一律帶 Content-Length：沒有長度資訊的 body 會被 server 當成下一個請求的開頭（格式錯誤）
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = String(Buffer.byteLength(data));
+    }
+    // agent: false：每個請求使用獨立連線，測試之間不共用 keep-alive socket
+    const req = http.request({ host: UI_HOST, port: srv.port, method: opts.method ?? 'GET', path: opts.path ?? '/', headers, agent: false }, (res) => {
       const chunks: Buffer[] = [];
       res.on('data', (c: Buffer) => chunks.push(c));
       res.on('end', () => {
@@ -285,9 +290,24 @@ describe('本機 HTTP server', () => {
     ['POST', '/api/rules'],
     ['POST', '/api/shutdown'],
   ])('%s %s：缺少或錯誤 Token 回傳 403', async (method, p) => {
-    expect((await request(srv, { method, path: p, token: null, body: {} })).status).toBe(403);
-    expect((await request(srv, { method, path: p, token: 'a'.repeat(64), body: {} })).status).toBe(403);
-    expect((await request(srv, { method, path: p, token: srv.token.slice(0, 10), body: {} })).status).toBe(403);
+    const body = method === 'GET' ? undefined : {};
+    expect((await request(srv, { method, path: p, token: null, body })).status).toBe(403);
+    expect((await request(srv, { method, path: p, token: 'a'.repeat(64), body })).status).toBe(403);
+    expect((await request(srv, { method, path: p, token: srv.token.slice(0, 10), body })).status).toBe(403);
+  });
+
+  it('沒有長度資訊的請求 body 會被當成格式錯誤而關閉連線，server 仍可繼續服務', async () => {
+    const malformed = await new Promise<string>((resolve) => {
+      const req = http.request({ host: UI_HOST, port: srv.port, method: 'GET', path: '/api/status', headers: { Host: `${UI_HOST}:${srv.port}` }, agent: false }, (res) => {
+        res.resume();
+        res.on('end', () => resolve(String(res.statusCode)));
+      });
+      req.on('error', (e) => resolve(e.message));
+      req.write('{}');
+      req.end();
+    });
+    expect(malformed).toBe('403');
+    expect((await request(srv, { path: '/api/status' })).status).toBe(200);
   });
 
   it.each([`localhost:PORT`, 'evil.example', `evil.example:PORT`, `127.0.0.1:1`, '0.0.0.0:PORT'])('錯誤 Host（%s）回傳 403，含首頁', async (host) => {

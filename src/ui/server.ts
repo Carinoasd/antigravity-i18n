@@ -117,18 +117,26 @@ export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
   };
 
   const server = http.createServer(async (req, res) => {
+    /**
+     * 回應前先丟棄尚未讀取的請求 body（例如帶 body 卻被 403 拒絕的 POST），
+     * 讓 keep-alive 連線維持在正確的狀態。
+     */
+    const reply = (status: number, payload: unknown, headers?: Record<string, string>): void => {
+      if (!req.readableEnded) req.resume();
+      send(res, status, payload, headers);
+    };
     try {
       const expectedHost = `${UI_HOST}:${port}`;
-      if (req.headers.host !== expectedHost) return send(res, 403, { ok: false, error: 'Host 不符' });
+      if (req.headers.host !== expectedHost) return reply(403, { ok: false, error: 'Host 不符' });
       const origin = req.headers.origin;
-      if (origin !== undefined && origin !== `http://${expectedHost}`) return send(res, 403, { ok: false, error: 'Origin 不符' });
+      if (origin !== undefined && origin !== `http://${expectedHost}`) return reply(403, { ok: false, error: 'Origin 不符' });
 
       const url = new URL(req.url ?? '/', `http://${expectedHost}`);
       const method = req.method ?? 'GET';
 
       if (url.pathname === '/' && method === 'GET') {
         const nonce = crypto.randomBytes(16).toString('base64');
-        return send(res, 200, renderUiHtml({ token, nonce, version: ctx.toolVersion, hookVersion: HOOK_VERSION }), {
+        return reply(200, renderUiHtml({ token, nonce, version: ctx.toolVersion, hookVersion: HOOK_VERSION }), {
           'Content-Security-Policy': [
             "default-src 'none'",
             `script-src 'nonce-${nonce}'`,
@@ -142,37 +150,37 @@ export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
         });
       }
 
-      if (!url.pathname.startsWith('/api/')) return send(res, 404, { ok: false, error: '找不到' });
-      if (!tokenMatches(req.headers[TOKEN_HEADER], token)) return send(res, 403, { ok: false, error: 'Token 不符' });
+      if (!url.pathname.startsWith('/api/')) return reply(404, { ok: false, error: '找不到' });
+      if (!tokenMatches(req.headers[TOKEN_HEADER], token)) return reply(403, { ok: false, error: 'Token 不符' });
 
       const route = `${method} ${url.pathname}`;
       switch (route) {
         case 'GET /api/status': {
           const paths = { app: url.searchParams.get('app') ?? undefined, ide: url.searchParams.get('ide') ?? undefined, cli: url.searchParams.get('cli') ?? undefined };
-          return send(res, 200, { ok: true, ...(await collectStatus(ctx, paths)) });
+          return reply(200, { ok: true, ...(await collectStatus(ctx, paths)) });
         }
         case 'POST /api/apply': {
           const body = await readJson(req);
-          return send(res, 200, await exclusive(() => runApply(ctx, body)));
+          return reply(200, await exclusive(() => runApply(ctx, body)));
         }
         case 'POST /api/restore': {
           const body = await readJson(req);
-          return send(res, 200, await exclusive(() => runRestore(ctx, body)));
+          return reply(200, await exclusive(() => runRestore(ctx, body)));
         }
         case 'POST /api/bg':
-          return send(res, 200, runBg(ctx, await readJson(req)));
+          return reply(200, runBg(ctx, await readJson(req)));
         case 'POST /api/rules':
-          return send(res, 200, runRules(ctx, await readJson(req)));
+          return reply(200, runRules(ctx, await readJson(req)));
         case 'POST /api/shutdown':
-          send(res, 200, { ok: true, message: '控制台已關閉' });
+          reply(200, { ok: true, message: '控制台已關閉' });
           setImmediate(() => void close());
           return;
         default:
-          return send(res, 404, { ok: false, error: '找不到' });
+          return reply(404, { ok: false, error: '找不到' });
       }
     } catch (e) {
-      if (e instanceof RequestError) return send(res, e.status, { ok: false, error: e.message });
-      return send(res, 500, { ok: false, error: toFriendly(e).message, detail: toFriendly(e) });
+      if (e instanceof RequestError) return reply(e.status, { ok: false, error: e.message });
+      return reply(500, { ok: false, error: toFriendly(e).message, detail: toFriendly(e) });
     }
   });
 
