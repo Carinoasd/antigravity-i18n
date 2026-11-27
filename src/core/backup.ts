@@ -9,14 +9,25 @@ export function sha256(data: Buffer | string): string {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
-/** 以串流計算檔案 SHA-256（適用於大型 asar） */
+/**
+ * 以串流計算檔案 SHA-256（適用於大型 asar）。
+ *
+ * 等到 `close`（而非 `end`）才 resolve：`end` 時檔案控制代碼可能還開著，
+ * Windows 上緊接著覆蓋或刪除同一個檔案（例如 rename 新的 app.asar）會失敗。
+ */
 export async function sha256File(file: string): Promise<string> {
   const hash = crypto.createHash('sha256');
   await new Promise<void>((resolve, reject) => {
+    let failed = false;
     fs.createReadStream(file)
       .on('data', (chunk) => hash.update(chunk))
-      .on('end', () => resolve())
-      .on('error', reject);
+      .on('error', (e) => {
+        failed = true;
+        reject(e);
+      })
+      .on('close', () => {
+        if (!failed) resolve();
+      });
   });
   return hash.digest('hex');
 }

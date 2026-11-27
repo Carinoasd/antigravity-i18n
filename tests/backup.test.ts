@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   atomicWrite,
   backupFile,
@@ -24,9 +24,27 @@ let dir: string;
 beforeEach(() => {
   dir = tmpDir();
 });
-afterEach(() => rm(dir));
+afterEach(() => {
+  vi.restoreAllMocks();
+  rm(dir);
+});
 
 describe('SHA-256', () => {
+  it('sha256File 在檔案控制代碼關閉後才回傳（Windows 才能接著覆蓋或刪除）', async () => {
+    const f = write(path.join(dir, 'big.bin'), Buffer.alloc(256 * 1024, 7));
+    const real = fs.createReadStream;
+    const streams: fs.ReadStream[] = [];
+    vi.spyOn(fs, 'createReadStream').mockImplementation(((...args: Parameters<typeof fs.createReadStream>) => {
+      const s = real(...args);
+      streams.push(s);
+      return s;
+    }) as typeof fs.createReadStream);
+    await sha256File(f);
+    expect(streams).toHaveLength(1);
+    expect(streams[0]!.closed).toBe(true);
+    await expect(sha256File(path.join(dir, 'missing.bin'))).rejects.toThrow(/ENOENT/);
+  });
+
   it('sha256 與 sha256File 結果一致', async () => {
     const f = write(path.join(dir, 'a.txt'), 'hello');
     expect(sha256('hello')).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
