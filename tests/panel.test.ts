@@ -9,7 +9,7 @@ import { setPreset } from '../src/core/background.js';
 import { BACKGROUND_PRESETS, presetMeta } from '../src/core/presets.js';
 import { HOOK_VERSION, PANEL_MAX_BYTES, RUNTIME_FILE_NAME, buildRuntimeScript, injectHook } from '../src/core/runtime.js';
 import { applyBackground, type BackgroundPayload } from '../src/runtime/background.js';
-import { I18N_DISABLED_KEY, antigravityI18nOverlay, type OverlayHandle } from '../src/runtime/overlay.js';
+import { I18N_DISABLED_KEY, I18N_LANG_KEY, antigravityI18nOverlay, type OverlayHandle } from '../src/runtime/overlay.js';
 import { MISSING_TRANSLATION_URL, SCAN_MAX_LEN, antigravityI18nPanel, type PanelHandle } from '../src/runtime/panel.js';
 import { rm, tmpDir, write } from './helpers.js';
 
@@ -298,7 +298,8 @@ describe('持久化（IndexedDB）', () => {
     await boot({ idb });
     const put = (value: unknown): Promise<void> =>
       new Promise((resolve, reject) => {
-        const req = idb.open('antigravity-i18n', 1);
+        // 不指定版本：開啟面板升級後的目前版本（v2）
+        const req = idb.open('antigravity-i18n');
         req.onsuccess = () => {
           const tx = req.result.transaction('settings', 'readwrite');
           tx.objectStore('settings').put(value, 'background');
@@ -400,45 +401,106 @@ describe('「設定 → 外觀」頁面的小按鈕', () => {
   });
 });
 
-describe('中／英文切換', () => {
-  it('停用翻譯：記住選擇並提示重新整理才會恢復原文；重新啟用立即翻譯', async () => {
-    const b = await boot({ i18n: true });
-    const box = b.$('[data-agi18n="i18n"]') as HTMLInputElement;
-    expect(box.checked).toBe(true);
-    expect(box.disabled).toBe(false);
+describe('介面語言：五語即時切換', () => {
+  /** 四語 runtime（與 apply 產生的格式相同） */
+  const FOUR = {
+    'zh-CN': { Settings: '设置', Appearance: '外观' },
+    ja: { Settings: '設定', Appearance: '外観' },
+    ko: { Settings: '설정', Appearance: '모양' },
+  };
 
-    box.checked = false;
-    box.dispatchEvent(new b.win.Event('change'));
-    expect(b.win.localStorage.getItem(I18N_DISABLED_KEY)).toBe('1');
+  async function bootFour(opts: { pre?: (win: Win) => void; html?: string } = {}): Promise<Booted> {
+    const dom = new JSDOM(`<!doctype html><html><head></head><body>${opts.html ?? '<main id="app"><button id="btn">Settings</button></main>'}</body></html>`, {
+      runScripts: 'outside-only',
+      url: 'http://localhost:5173/',
+    });
+    const win = dom.window as unknown as Win;
+    opts.pre?.(win);
+    win.eval(buildRuntimeScript({ Settings: '設定', Appearance: '外觀' }, { lang: 'zh-TW', version: '0' }, FOUR));
+    win.eval(panelScript(null));
+    const panel = win.__ANTIGRAVITY_I18N_PANEL__;
+    await panel.ready;
+    const doc = win.document;
+    const $ = (sel: string): HTMLElement => {
+      const el = doc.querySelector(sel);
+      if (!el) throw new Error(`not found: ${sel}`);
+      return el as HTMLElement;
+    };
+    return { win, doc, panel, $, css: () => '' };
+  }
+
+  it('選單列出 runtime 內有譯文的語系與英文原文，切換立即生效並記住選擇', async () => {
+    const b = await bootFour();
+    const sel = b.$('[data-agi18n="i18n"]') as HTMLSelectElement;
+    expect(Array.from(sel.options).map((o) => [o.value, o.textContent])).toEqual([
+      ['zh-TW', '繁體中文'],
+      ['zh-CN', '简体中文'],
+      ['ja', '日本語'],
+      ['ko', '한국어'],
+      ['en', 'English（原文）'],
+    ]);
+    expect(sel.value).toBe('zh-TW');
+    expect(b.$('#btn').textContent).toBe('設定');
+
+    setValue(b, '[data-agi18n="i18n"]', 'ko', 'change');
+    expect(b.$('#btn').textContent).toBe('설정');
+    expect(b.win.localStorage.getItem(I18N_LANG_KEY)).toBe('ko');
+    expect(msg(b)).toContain('한국어');
+
+    setValue(b, '[data-agi18n="i18n"]', 'en', 'change');
+    expect(b.$('#btn').textContent).toBe('Settings');
     expect(b.win.__ANTIGRAVITY_I18N__!.enabled).toBe(false);
-    expect(msg(b)).toContain('重新整理頁面');
+    expect(b.win.localStorage.getItem(I18N_LANG_KEY)).toBe('en');
+    // 同步維護舊旗標
+    expect(b.win.localStorage.getItem(I18N_DISABLED_KEY)).toBe('1');
     const added = b.doc.createElement('button');
     added.textContent = 'Settings';
     b.$('#app').appendChild(added);
     await sleep(0);
     expect(added.textContent).toBe('Settings');
 
-    box.checked = true;
-    box.dispatchEvent(new b.win.Event('change'));
+    setValue(b, '[data-agi18n="i18n"]', 'zh-CN', 'change');
+    expect(b.$('#btn').textContent).toBe('设置');
+    expect(added.textContent).toBe('设置');
     expect(b.win.localStorage.getItem(I18N_DISABLED_KEY)).toBeNull();
-    expect(added.textContent).toBe('設定');
-    expect(msg(b)).toContain('已重新啟用');
+    expect(sel.value).toBe('zh-CN');
   });
 
-  it('停用狀態下重新整理：頁面維持英文原文', async () => {
-    const dom = new JSDOM('<!doctype html><html><body><button id="b">Settings</button></body></html>', { runScripts: 'outside-only', url: 'http://localhost/' });
-    dom.window.localStorage.setItem(I18N_DISABLED_KEY, '1');
-    dom.window.eval(buildRuntimeScript({ Settings: '設定' }, { lang: 'zh-TW', version: '0' }));
-    expect(dom.window.document.getElementById('b')!.textContent).toBe('Settings');
-    const handle = (dom.window as unknown as { __ANTIGRAVITY_I18N__: OverlayHandle }).__ANTIGRAVITY_I18N__;
-    expect(handle.enabled).toBe(false);
-    handle.resume();
-    expect(dom.window.document.getElementById('b')!.textContent).toBe('設定');
+  it('重新開啟視窗時套用記住的語系；handle.setLang 與選單同步', async () => {
+    const b = await bootFour({ pre: (w) => (w.localStorage.setItem(I18N_LANG_KEY, 'ja'), w.localStorage.setItem('antigravity-i18n:lang-base', 'zh-TW')) });
+    expect(b.$('#btn').textContent).toBe('設定');
+    expect(b.win.__ANTIGRAVITY_I18N__!.lang).toBe('ja');
+    expect((b.$('[data-agi18n="i18n"]') as HTMLSelectElement).value).toBe('ja');
+    b.panel.setLang('ko');
+    expect(b.$('#btn').textContent).toBe('설정');
+    expect((b.$('[data-agi18n="i18n"]') as HTMLSelectElement).value).toBe('ko');
   });
 
-  it('沒有翻譯 runtime 時開關停用', async () => {
-    const b = await boot();
-    expect((b.$('[data-agi18n="i18n"]') as HTMLInputElement).disabled).toBe(true);
+  it('舊版旗標相容：只有 i18n-disabled=1 時以英文原文載入，選回中文後清除旗標', async () => {
+    const b = await bootFour({ pre: (w) => w.localStorage.setItem(I18N_DISABLED_KEY, '1') });
+    expect(b.$('#btn').textContent).toBe('Settings');
+    expect((b.$('[data-agi18n="i18n"]') as HTMLSelectElement).value).toBe('en');
+    setValue(b, '[data-agi18n="i18n"]', 'zh-TW', 'change');
+    expect(b.$('#btn').textContent).toBe('設定');
+    expect(b.win.localStorage.getItem(I18N_DISABLED_KEY)).toBeNull();
+  });
+
+  it('單一語系 runtime：只列出該語系與英文；沒有翻譯 runtime 時選單停用', async () => {
+    const b = await boot({ i18n: true });
+    expect(Array.from((b.$('[data-agi18n="i18n"]') as HTMLSelectElement).options).map((o) => o.value)).toEqual(['zh-TW', 'en']);
+    const none = await boot();
+    expect((none.$('[data-agi18n="i18n"]') as HTMLSelectElement).disabled).toBe(true);
+  });
+
+  it('語系偏好的 localStorage key 在 overlay、面板與 runtime 腳本中一致', () => {
+    expect(I18N_LANG_KEY).toBe('antigravity-i18n:lang');
+    const literal = (k: string): RegExp => new RegExp(`["']${k}["']`);
+    expect(antigravityI18nOverlay.toString()).toMatch(literal(I18N_LANG_KEY));
+    expect(antigravityI18nOverlay.toString()).toMatch(literal(I18N_DISABLED_KEY));
+    expect(antigravityI18nPanel.toString()).toMatch(literal(I18N_DISABLED_KEY));
+    const script = buildRuntimeScript({}, { lang: 'zh-TW', version: '0' });
+    expect(script).toContain(I18N_LANG_KEY);
+    expect(script).toContain(I18N_DISABLED_KEY);
   });
 });
 
