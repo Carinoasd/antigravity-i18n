@@ -301,6 +301,11 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     return wc;
   };
 
+  /** 掛鉤 v4 起，每個內部頁面都會另外注入背景設定面板 */
+  const isPanel = (js: string): boolean => js.includes('__ANTIGRAVITY_I18N_PANEL__');
+  const runtimes = (wc: FakeWc): string[] => wc.injected.filter((js) => !isPanel(js));
+  const panels = (wc: FakeWc): string[] => wc.injected.filter(isPanel);
+
   /** 建立含假 electron 套件的暫存 App */
   function makeApp(format: 'cjs' | 'esm'): string {
     write(path.join(dir, 'node_modules', 'electron', 'package.json'), '{"name":"electron","main":"index.js"}');
@@ -348,13 +353,15 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     createRequire(main)(main);
     expect(g.__mainRan).toBe('function');
     const { win, view, webview, devtools } = exercise();
-    expect(win.injected).toEqual([script]);
-    expect(view.injected).toEqual([script]);
+    expect(runtimes(win)).toEqual([script]);
+    expect(runtimes(view)).toEqual([script]);
+    expect(panels(win)).toHaveLength(1);
+    expect(panels(view)).toHaveLength(1);
     expect(webview.injected).toEqual([]);
     expect(devtools.injected).toEqual([]);
     // 每次換頁（新的 dom-ready）都會重新注入
     win.emit('dom-ready');
-    expect(win.injected).toHaveLength(2);
+    expect(runtimes(win)).toHaveLength(2);
   });
 
   it('略過外部 http/https 網站，只注入本機與內部 scheme', () => {
@@ -375,7 +382,8 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
       const wc = fakeWc('browserView', url);
       app.emit('web-contents-created', {}, wc);
       wc.emit('dom-ready');
-      expect([url, wc.injected.length]).toEqual([url, expected ? 1 : 0]);
+      // 內部頁面：翻譯 runtime + 背景面板；外部網站：什麼都不注入
+      expect([url, runtimes(wc).length, panels(wc).length]).toEqual([url, expected ? 1 : 0, expected ? 1 : 0]);
     }
   });
 
@@ -389,21 +397,25 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     wc.emit('dom-ready');
     wc.url = 'file:///app/settings.html';
     wc.emit('dom-ready');
-    expect(wc.injected).toHaveLength(2);
+    expect(runtimes(wc)).toHaveLength(2);
+    expect(panels(wc)).toHaveLength(2);
   });
 
-  it('掛鉤 v3 內嵌完整的預設表', () => {
-    expect(HOOK_VERSION).toBe(3);
+  it('掛鉤 v4 內嵌完整的預設表與背景面板', () => {
+    expect(HOOK_VERSION).toBe(4);
     for (const format of ['cjs', 'esm'] as const) {
       const hook = buildHook(format);
       expect(hook).toContain(`/* antigravity-i18n:hook-version ${HOOK_VERSION} */`);
       expect(hook).toContain('var __agi18nPresets = ');
       for (const [name, p] of Object.entries(BACKGROUND_PRESETS)) expect(hook).toContain(JSON.stringify(name) + ':' + JSON.stringify(p.image));
       expect(hook).toContain('bgCache, __agi18nPresets)');
+      expect(hook).toContain('var __agi18nPanel = ');
+      expect(hook).toContain('ANTIGRAVITY_I18N_NO_PANEL');
+      for (const p of Object.values(BACKGROUND_PRESETS)) expect(hook).toContain(JSON.stringify(p.label));
     }
   });
 
-  it('預設 + 遮罩：dom-ready 時注入漸層背景，切換預設不需重新打包', () => {
+  it('預設 + 遮罩：dom-ready 時注入漸層背景，切換預設不需重新打包', async () => {
     const toolHome = process.env.ANTIGRAVITY_I18N_HOME!;
     setPreset(toolHome, 'aurora', { wsl: null, opacity: '0.2', tint: 'rgba(0,0,0,0.25)' });
     const main = makeApp('cjs');
@@ -422,6 +434,8 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     // 在 jsdom 執行實際注入的兩段腳本：翻譯與背景圖都生效
     const dom = new JSDOM('<html><head></head><body><button id="b">Settings</button></body></html>', { runScripts: 'outside-only' });
     for (const js of win.injected) dom.window.eval(js);
+    // 面板先讀取 IndexedDB（jsdom 沒有 → 降級），再套用 CLI 設定
+    await (dom.window as unknown as { __ANTIGRAVITY_I18N_PANEL__: { ready: Promise<void> } }).__ANTIGRAVITY_I18N_PANEL__.ready;
     const d = dom.window.document;
     expect(d.getElementById('b')!.textContent).toBe('設定');
     const css = d.getElementById('antigravity-i18n-bg-style')!.textContent!;
@@ -433,7 +447,8 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     win.emit('dom-ready');
     expect(win.injected[3]).toContain('"preset":"forest"');
     expect(win.injected[3]).toContain('"blur":6');
-    expect(win.injected[3]).not.toContain('"tint"');
+    // 不帶遮罩的預設：payload 不會殘留上一次的 tint
+    expect(win.injected[3]).not.toContain('"tint":"');
   });
 
   it('從預設切回圖片', () => {
@@ -467,7 +482,8 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     await import(pathToFileURL(main).href);
     expect(g.__mainRan).toBe('function');
     const { win, webview } = exercise();
-    expect(win.injected).toEqual([script]);
+    expect(runtimes(win)).toEqual([script]);
+    expect(panels(win)).toHaveLength(1);
     expect(webview.injected).toEqual([]);
   });
 
@@ -487,7 +503,9 @@ describe('主行程掛鉤：在模擬的 Electron 中實際執行', () => {
     expect(g.__mainRan).toBe('function');
     // 掛鉤仍會註冊（背景圖不依賴翻譯 runtime），但沒有可注入的翻譯腳本
     const { win } = exercise();
-    expect(win.injected).toEqual([]);
+    expect(runtimes(win)).toEqual([]);
+    // 背景面板不依賴翻譯 runtime，照常注入
+    expect(panels(win)).toHaveLength(1);
     expect(warn.mock.calls.some((c) => String(c[0]).includes('runtime not loaded'))).toBe(true);
     warn.mockRestore();
   });

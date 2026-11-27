@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { applyBackground, readBackgroundPayload } from '../runtime/background.js';
-import { presetImages } from './presets.js';
 import { antigravityI18nOverlay, type OverlayOptions } from '../runtime/overlay.js';
+import { antigravityI18nPanel } from '../runtime/panel.js';
+import { presetImages, presetMeta } from './presets.js';
 import type { Dictionary } from '../types.js';
 
 /**
@@ -28,8 +29,12 @@ export const RUNTIME_MARKER = '/* antigravity-i18n:runtime */';
  * - 1：翻譯 runtime
  * - 2：翻譯 runtime + 自訂背景圖
  * - 3：背景圖支援內建漸層預設（bg preset）與可讀性遮罩（--tint）
+ * - 4：介面內背景設定面板（Ctrl+Alt+B），設定存於 IndexedDB
  */
-export const HOOK_VERSION = 3;
+export const HOOK_VERSION = 4;
+
+/** 介面面板選圖的大小上限（與 CLI 相同） */
+export const PANEL_MAX_BYTES = 10 * 1024 * 1024;
 
 export type ModuleFormat = 'cjs' | 'esm';
 
@@ -118,6 +123,8 @@ function installSource(): string {
     var __agi18nReadBg = ${inlineFn(readBackgroundPayload, 'readBackgroundPayload', '__agi18nReadBg')};
     var __agi18nApplyBg = ${JSON.stringify(applyBackground.toString())};
     var __agi18nPresets = ${JSON.stringify(presetImages())};
+    var __agi18nPanel = ${JSON.stringify(antigravityI18nPanel.toString())};
+    var __agi18nPanelPresets = ${JSON.stringify(presetMeta())};
     function __agi18nInstall(app, code, readBg) {
     if (!app || (!code && !readBg) || globalThis.__ANTIGRAVITY_I18N_HOOK__) return;
     globalThis.__ANTIGRAVITY_I18N_HOOK__ = ${HOOK_VERSION};
@@ -138,10 +145,17 @@ function installSource(): string {
         if (!__agi18nIsInternalUrl(url)) return;
         if (code) inject(wc, code, 'runtime');
         // 自訂背景圖：每次載入重新讀取設定，換圖不需重新打包；任何錯誤都不影響翻譯
-        if (readBg) {
+        if (readBg && process.env.ANTIGRAVITY_I18N_NO_BG !== '1') {
           var bg = null;
           try { bg = readBg(); } catch (e) { console.warn('[antigravity-i18n] background:', e && e.message); }
-          if (bg) inject(wc, '(' + __agi18nApplyBg + ')(' + JSON.stringify(bg) + ');', 'background');
+          if (process.env.ANTIGRAVITY_I18N_NO_PANEL === '1') {
+            // 停用介面面板：只套用 CLI 設定
+            if (bg) inject(wc, '(' + __agi18nApplyBg + ')(' + JSON.stringify(bg) + ');', 'background');
+          } else {
+            // 介面面板（Ctrl+Alt+B）：即使沒有 CLI 設定也注入，讓使用者隨時能在介面中設定
+            var panelCfg = { cli: bg, presets: __agi18nPanelPresets, maxBytes: ${PANEL_MAX_BYTES}, version: ${HOOK_VERSION} };
+            inject(wc, '(function(){var applyBackground=' + __agi18nApplyBg + ';(' + __agi18nPanel + ')(applyBackground,' + JSON.stringify(panelCfg) + ');})();', 'background panel');
+          }
         }
       });
     });

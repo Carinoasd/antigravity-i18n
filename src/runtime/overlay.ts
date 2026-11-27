@@ -25,9 +25,16 @@ export interface OverlayHandle {
   translate(text: string): string | null;
   /** 重新掃描整份文件 */
   refresh(): void;
-  /** 停止監聽 DOM 變更 */
+  /** 目前是否啟用翻譯 */
+  readonly enabled: boolean;
+  /** 停止翻譯與監聽 DOM 變更（已翻譯的文字需重新整理頁面才會恢復原文） */
   stop(): void;
+  /** 重新啟用翻譯：立即翻譯整份文件並恢復監聽 */
+  resume(): void;
 }
+
+/** 介面面板寫入的同步旗標：設為 '1' 時，頁面載入後不啟用翻譯 */
+export const I18N_DISABLED_KEY = 'antigravity-i18n:i18n-disabled';
 
 export function antigravityI18nOverlay(dict: Record<string, string>, options: OverlayOptions): void {
   const MARK = '__ANTIGRAVITY_I18N__';
@@ -191,28 +198,19 @@ export function antigravityI18nOverlay(dict: Record<string, string>, options: Ov
     }
   });
 
+  // 使用者在介面面板停用翻譯時會寫入此旗標（同步讀取，避免先翻譯再還原的閃爍）
   let stopped = false;
+  try {
+    const ls = (g as { localStorage?: Storage }).localStorage;
+    stopped = !!ls && ls.getItem('antigravity-i18n:i18n-disabled') === '1';
+  } catch {
+    stopped = false;
+  }
   const refresh = (): void => {
     if (!stopped && doc.documentElement) walk(doc.documentElement);
   };
-
-  const handle: OverlayHandle = {
-    lang: options.lang,
-    version: options.version,
-    entries: exact.size + patterns.length,
-    translate,
-    refresh,
-    stop: () => {
-      stopped = true;
-      observer.disconnect();
-    },
-  };
-  g[MARK] = handle;
-
-  // 立即掃描並開始監聽；若文件仍在解析中，解析器插入的節點也會被 observer 捕捉，
-  // DOMContentLoaded 時再完整補掃一次。
-  if (doc.documentElement) {
-    refresh();
+  const observe = (): void => {
+    if (!doc.documentElement) return;
     observer.observe(doc.documentElement, {
       childList: true,
       subtree: true,
@@ -220,6 +218,35 @@ export function antigravityI18nOverlay(dict: Record<string, string>, options: Ov
       attributes: true,
       attributeFilter: ATTRS,
     });
+  };
+
+  const handle: OverlayHandle = {
+    lang: options.lang,
+    version: options.version,
+    entries: exact.size + patterns.length,
+    get enabled(): boolean {
+      return !stopped;
+    },
+    translate,
+    refresh,
+    stop: () => {
+      stopped = true;
+      observer.disconnect();
+    },
+    resume: () => {
+      if (!stopped) return;
+      stopped = false;
+      refresh();
+      observe();
+    },
+  };
+  g[MARK] = handle;
+
+  // 立即掃描並開始監聽；若文件仍在解析中，解析器插入的節點也會被 observer 捕捉，
+  // DOMContentLoaded 時再完整補掃一次。
+  if (!stopped) {
+    refresh();
+    observe();
   }
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', refresh, { once: true });
 }

@@ -41,5 +41,9 @@
   "Command Palette": "命令面板",
   "Show All Commands": "显示所有命令",
   "MCP Servers": "MCP 服务器",
-  "Manage MCP Servers": "管理 MCP 服务器"
+  "Manage MCP Servers": "管理 MCP 服务器",
+  "Application": "应用程序",
+  "Shortcuts": "快捷键",
+  "Not in Project": "未在项目中",
+  "Give Feedback": "提供反馈"
 }

@@ -553,21 +553,42 @@ describe('主行程掛鉤：在模擬的 Electron 中載入背景圖', () => {
     expect(open('https://example.com/').injected).toEqual([]);
   });
 
-  it('ANTIGRAVITY_I18N_NO_BG=1 或 bg off 時只注入翻譯 runtime', () => {
+  it('ANTIGRAVITY_I18N_NO_BG=1 時完全不注入背景與面板；bg off 時面板仍可用但沒有 CLI 背景', () => {
     setBackground(home, image(), NO_WSL);
     process.env.ANTIGRAVITY_I18N_NO_BG = '1';
     loadMain();
     expect(open().injected).toEqual(['/* runtime */']);
     delete process.env.ANTIGRAVITY_I18N_NO_BG;
     setBackgroundEnabled(home, false, NO_WSL);
-    expect(open().injected).toEqual(['/* runtime */']);
+    const off = open().injected;
+    expect(off[0]).toBe('/* runtime */');
+    expect(off).toHaveLength(2);
+    expect(off[1]).toContain('__ANTIGRAVITY_I18N_PANEL__');
+    expect(off[1]).toContain('"cli":null');
+  });
+
+  it('ANTIGRAVITY_I18N_NO_PANEL=1 時只套用 CLI 背景，不注入面板', () => {
+    setBackground(home, image(), NO_WSL);
+    process.env.ANTIGRAVITY_I18N_NO_PANEL = '1';
+    try {
+      loadMain();
+      const js = open().injected;
+      expect(js).toHaveLength(2);
+      expect(js[1]).not.toContain('__ANTIGRAVITY_I18N_PANEL__');
+      expect(js[1]).toContain(`data:image/png;base64,${PNG.toString('base64')}`);
+    } finally {
+      delete process.env.ANTIGRAVITY_I18N_NO_PANEL;
+    }
   });
 
   it('背景設定損壞時只警告，翻譯 runtime 照常注入', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     write(path.join(home, 'background.json'), '{ broken');
     loadMain();
-    expect(open().injected).toEqual(['/* runtime */']);
+    const js = open().injected;
+    expect(js[0]).toBe('/* runtime */');
+    // 面板照常注入，但沒有 CLI 背景
+    expect(js[1]).toContain('"cli":null');
     expect(warn).toHaveBeenCalled();
   });
 
@@ -968,7 +989,7 @@ describe('bg preset / presets 指令與掛鉤升級提示', () => {
       runtime: { entries: 1, mainEntry: 'dist/main.js', runtimeFile: 'dist/x.js', hookVersion: 2 },
     };
     writeManifest(manifestPathFor(home, { id: 'app', installRoot: m.installRoot }), m);
-    expect(HOOK_VERSION).toBe(3);
-    expect(hookHint(home)).toMatch(/v2.*v3.*bg preset.*--tint.*--force/);
+    expect(HOOK_VERSION).toBe(4);
+    expect(hookHint(home)).toMatch(/v2.*v4.*bg preset.*--tint.*Ctrl\+Alt\+B.*--force/);
   });
 });

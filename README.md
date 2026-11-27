@@ -8,6 +8,7 @@
 - 🧪 `--dry-run` 先預覽命中字串數與覆蓋率，不動任何檔案
 - 🪶 **零侵入模式**：只安裝全域規則，讓 AI 全程以中文回覆，完全不修改安裝檔
 - 🖼️ **自訂背景圖**（App）：`bg set` 使用自己的圖片，或 `bg preset` 套用 5 款內建純 CSS 漸層；`--tint` 加上可讀性遮罩；換圖、換預設都不需重新套用
+- 🎛️ **介面內背景面板**（App）：按 **`Ctrl + Alt + B`**（macOS `Cmd + Option + B`）直接在 Antigravity 裡選圖、換預設、拖拉桿，0 秒生效、免重開
 - ✅ 內建 CI 詞庫驗證器（key 一致性、佔位符、保護詞、繁簡用語檢查）
 
 > ⚠️ 本專案為社群專案，與 Google 無關。修改應用程式檔案有風險，請先用 `--dry-run` 預覽，並確認 `restore` 可正常運作。
@@ -223,9 +224,37 @@ antigravity-i18n bg set ~/Pictures/wallpaper.jpg --tint none   # 移除遮罩
 - 向下相容：舊版工具寫入、沒有 `kind` 欄位的 `background.json` 會被視為圖片設定，照常運作。
 - 與翻譯共用同一個主行程掛鉤：外部網站（內建瀏覽器開啟的網頁）不會套用背景圖。
 - 讀檔失敗、圖片遺失或格式異常時只在主控台警告，不影響 App 啟動與翻譯。
-- `bg off` 暫時停用並保留設定；臨時關閉也可以用環境變數 `ANTIGRAVITY_I18N_NO_BG=1` 啟動 Antigravity。
+- `bg off` 暫時停用並保留設定；臨時關閉也可以用環境變數 `ANTIGRAVITY_I18N_NO_BG=1` 啟動 Antigravity（背景與介面面板都會停用）。
 
-前置條件：背景圖由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤（目前為 v3：v2 支援圖片，v3 加上預設與遮罩）；`bg status` 與 `status` 會提示目前狀態。
+#### 介面內背景面板（`Ctrl + Alt + B`）
+
+不想開終端機打路徑？直接在 Antigravity 裡設定，**0 秒生效、免重開**：
+
+| 開啟方式 | 說明 |
+| --- | --- |
+| **`Ctrl + Alt + B`**（macOS：**`Cmd + Option + B`**） | 隨時開關面板；按 `Esc` 或點面板外即可關閉 |
+| 「設定 → 外觀（Appearance）」頁面 | 右下角會出現低調的「🖼 背景設定」小按鈕，離開設定頁即自動隱藏 |
+
+面板內可以：
+
+- **選擇本機圖片**：透過系統檔案視窗挑選 PNG / JPEG / WebP / GIF，超過 10 MB 會提示並拒絕
+- **一鍵切換 5 款內建預設**：極光、星雲、霓虹夕陽、深夜藍、靜謐森林（與 `bg preset` 同一份預設表）
+- **即時微調**：啟用／停用、不透明度（0.01 ~ 1.00）、模糊（0 ~ 32px）、對齊（置中／上／下／左／右）、縮放（cover / contain）、遮罩（無／暗色 25%／深暗 45%／深藍 35%）、圖層模式（overlay / underlay）
+- **重設**：清除介面設定，改回 CLI 的 `background.json`（沒有 CLI 設定時即關閉背景）
+- **中／英文切換**：停用翻譯後，已翻譯的文字需重新整理頁面（`Ctrl + R`）才會恢復英文原文；重新啟用則立即翻譯
+
+**儲存與優先順序**
+
+- 面板的設定（含選擇的圖片）存在 Antigravity 本機的 **IndexedDB**（資料庫 `antigravity-i18n`），不受 `localStorage` 5 MB 限制，重開 Antigravity 會自動載入，也完全不需要處理 WSL / Windows 路徑
+- **介面設定優先**：IndexedDB 有介面設定時套用介面設定；沒有（或已按「重設」）時套用 CLI 的 `background.json`
+- 只調整參數、沒有換圖時，面板會沿用 CLI 的圖片，只保存調整過的參數
+- 無法使用 IndexedDB（例如權限限制）時，自動降級為「只在目前視窗生效」並在面板中提示，不會影響 App 啟動
+- 從 IndexedDB 讀回的資料會重新驗證（數值範圍、選項白名單、圖片格式），被竄改的內容不會套用
+- 中／英文切換的選擇存在 `localStorage`：翻譯 runtime 必須在第一次掃描畫面前同步得知，IndexedDB 是非同步的
+
+面板與背景圖層都帶有 `data-antigravity-i18n-skip`，不會被翻譯 runtime 處理。只想停用面板、保留 CLI 背景時，以 `ANTIGRAVITY_I18N_NO_PANEL=1` 啟動 Antigravity。
+
+前置條件：背景圖與面板由主行程掛鉤載入，需要先執行過一次 `apply --target app`（預設會啟用執行期注入層）。在舊版本工具套用過的 App，請以 `apply --target app --force` 重新套用一次以更新掛鉤（目前為 v4：v2 支援圖片，v3 加上預設與遮罩，v4 加上介面內背景面板）；`bg status` 與 `status` 會提示目前狀態。
 
 **WSL**：Windows 版 Antigravity 讀的是 Windows 家目錄下的 `C:\Users\<你>\.antigravity-i18n\background.json`。在 WSL 中執行 `bg` 指令時會：
 
@@ -419,7 +448,8 @@ src/
 │   └── rules.ts           # 全域規則
 ├── runtime/
 │   ├── overlay.ts         # 注入 renderer 的 DOM 翻譯 runtime（零依賴、自足）
-│   └── background.ts      # 背景圖：主行程讀取設定 + renderer 注入圖層（皆序列化進掛鉤）
+│   ├── background.ts      # 背景圖：主行程讀取設定 + renderer 注入圖層（皆序列化進掛鉤）
+│   └── panel.ts           # 介面內背景設定面板（Ctrl+Alt+B、IndexedDB 持久化）
 └── commands/              # status / apply / restore / rules / bg / validate
 locales/                   # 詞庫（zh-TW、zh-CN 各 7 個模組）
 tests/                     # vitest 單元測試
