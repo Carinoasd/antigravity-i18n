@@ -8,25 +8,60 @@
 
 跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 多语言本地化与外观工具**：支持简体中文（`zh-CN`）、繁体中文（`zh-TW`）、日语（`ja`）、韩语（`ko`）与自定义背景，**不用记命令**，打开图形控制台点一下就好。
 
-## 🚀 最快的方式：直接打开图形控制台
+## 🚀 开始使用
 
-需要 [Node.js 20 以上](https://nodejs.org/)。在终端中运行：
+### 方法一：下载单文件可执行程序，双击打开（推荐普通用户）
+
+**无需安装 Node.js，无需输入命令。** 到 [Releases](https://github.com/Carinoasd/antigravity-i18n/releases/latest) 下载对应的文件：
+
+| 系统 | 文件 |
+| --- | --- |
+| Windows（x64） | `antigravity-i18n-win-x64.exe` |
+| macOS（Apple 芯片） | `antigravity-i18n-macos-arm64` |
+| Linux（x64） | `antigravity-i18n-linux-x64` |
+
+双击打开后，浏览器会自动打开本地图形控制台。
+
+- **Windows**：出现「Windows 已保护你的电脑」（SmartScreen）时，点击「**更多信息** → **仍要运行**」。程序没有付费的代码签名，所以会出现这个提示。
+- **macOS**：第一次请在访达中对文件**右键 → 打开**，再点击「打开」；如果仍被拦截，到「系统设置 → 隐私与安全性」点击「**仍要打开**」。从浏览器下载的文件可能丢失执行权限，可先运行 `chmod +x antigravity-i18n-macos-arm64`。
+- **Linux**：`chmod +x antigravity-i18n-linux-x64 && ./antigravity-i18n-linux-x64`
+- 如果启动时出错，窗口会显示错误信息并等你按 Enter 才关闭，方便截图反馈。
+
+**校验文件（建议）**：同一个 Release 附有 `SHA256SUMS.txt`，把它和程序放在同一个文件夹：
+
+```bash
+# macOS
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
+```powershell
+# Windows（PowerShell）：将输出的哈希与 SHA256SUMS.txt 中对应的一行比对
+Get-FileHash .\antigravity-i18n-win-x64.exe -Algorithm SHA256
+```
+
+> 第一个 Release 会在维护者推送 `v*` tag 后自动创建；在那之前请使用方法二。
+
+### 方法二：用 npx 运行（开发者／已安装 Node.js）
+
+需要 [Node.js 20 以上](https://nodejs.org/)：
 
 ```bash
 npx github:Carinoasd/antigravity-i18n
 ```
 
-浏览器会自动打开本地控制台，可以：
+> ⚠️ npm 上名为 `antigravity-i18n` 的包**不是本项目**（属于另一位作者）。请使用上面的 `github:` 写法，或按下方步骤从源码安装。
+
+### 控制台能做什么
 
 - 一键应用「简体中文 / 繁体中文 / 日语 / 韩语 ＋ 背景面板」
 - 只要自定义背景与 `Ctrl+Alt+B` 面板，保持英文界面
 - 一键无损还原官方原版
-- 应用 5 款内置渐变背景，调整不透明度／模糊／遮罩
+- 应用 5 款内置渐变背景或选择电脑中的图片，调整不透明度／模糊／遮罩
 - 安装或移除中文 AI 全局规则（零侵入模式）
 
 > 控制台只监听 `127.0.0.1`，每次启动都会生成新的访问 Token，其他电脑或网站都无法操作。点击「关闭控制台」或按 `Ctrl+C` 即可退出。
->
-> ⚠️ npm 上名为 `antigravity-i18n` 的包**不是本项目**（属于另一位作者）。请使用上面的 `github:` 写法，或按下方步骤从源码安装。
 
 ## 功能
 

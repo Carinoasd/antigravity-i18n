@@ -42,3 +42,11 @@ jobs:
           node dist/cli.js status
         env:
           ANTIGRAVITY_I18N_HOME: ${{ runner.temp }}/agi18n
+
+  # PR 階段就在三平台驗證單檔打包與冒煙測試，避免等到打 tag 才發現壞掉
+  standalone:
+    name: 單檔執行檔
+    uses: ./.github/workflows/sea.yml
+    with:
+      full-verify: false
+      upload-artifacts: false

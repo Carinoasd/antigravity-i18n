@@ -25,6 +25,13 @@ npm test
 node dist/cli.js validate
 ```
 
+`npm test` 也會打包 esbuild bundle 並跑完整冒煙測試（`tests/sea.test.ts`）。修改打包流程、`src/runtime/` 或 CLI 入口時，另外執行一次真正的單檔打包：
+
+```bash
+npm run build:sea
+npm run smoke:sea -- dist-sea/antigravity-i18n-<平台>-<架構>
+```
+
 - 不可用 `| tail`、`| head` 等管線包住後再看 exit code：管線會吞掉失敗。
 - 測試失敗時回報實際輸出，不可略過或改測試去遷就錯誤行為。
 - 修改 CLI 行為時，另外手動執行一次 `node dist/cli.js --help` 與相關指令確認輸出。
@@ -64,6 +71,13 @@ node dist/cli.js validate
   - `actions.ts`：把 CLI 功能包成回傳結構化結果的函式（不印出），偵測函式可注入。
   - `html.ts`：單一自足 HTML，腳本帶 CSP nonce；動態資料一律以 `textContent` 寫入，不可用 `innerHTML`。介面文字放在 `UI_TEXT`（zh-TW / zh-CN / en），同樣遵守繁簡用語規範。
   - 測試 server 時一律注入只認自訂路徑的 `detect`，並把 `toolHome` / `userHome` 指向暫存目錄。
+- **單檔執行檔（Node.js SEA）**：`npm run build:sea`（`scripts/build-sea.mjs`）以 esbuild 打包成 CJS 並用 postject 注入 Node 22 執行檔，產出 `dist-sea/antigravity-i18n-<win|macos|linux>-<arch>[.exe]`；`npm run smoke:sea -- <執行檔>`（`scripts/smoke-sea.mjs`）跑冒煙測試。
+  - **不可開啟 esbuild 的 `keepNames`**：它會在函式內插入 `__name()` helper，讓 `src/runtime/` 序列化的注入腳本不再自足。冒煙測試會實際套用假的 app.asar、在模擬的 Electron 與 jsdom 中執行注入腳本，並檢查沒有 esbuild helper。
+  - esbuild 可能為避免名稱衝突而改名函式（例如 `isInternalUrl2`）：序列化時一律用 `fn.name`，不可寫死函式名稱。
+  - 不可使用頂層 `await`（CJS 打包不支援）；`import.meta.url` 只能出現在一般模式才會執行的路徑。
+  - 單檔模式下詞庫與版本來自內嵌資源（`src/core/embedded.ts`，build 時以 `define` 注入 `__AGI18N_EMBEDDED__`），詞庫目錄為虛擬的 `<embedded>/locales`；新增需要讀取套件內檔案的功能時，必須同時支援內嵌模式。
+  - 執行期相依套件必須能被 esbuild 打包；只在 Electron 中才存在的模組（`electron`、`original-fs`）列為 external。
+  - 不帶參數啟動（例如雙擊執行檔）發生錯誤時，`launchInteractive()` 會印出訊息並等使用者按 Enter，不可移除。
 - CLI 的使用者訊息使用繁體中文；程式碼識別字使用英文。
 
 ## 安全原則（不可違反）
@@ -120,7 +134,11 @@ node dist/cli.js validate
 ## 目錄速查
 
 ```
-src/cli.ts                 commander 入口
+src/cli.ts                 commander 入口（不可使用頂層 await）
+src/core/embedded.ts       單檔執行檔的內嵌資源（詞庫、版本）
+scripts/build-sea.mjs      單檔執行檔打包（esbuild + Node SEA + postject）
+scripts/smoke-sea.mjs      單檔執行檔冒煙測試（Release 與 PR CI 共用）
+.github/workflows/         ci.yml（PR）、sea.yml（三平台打包，可重用）、release.yml（v* tag 發布）
 src/types.ts               共用型別、語系／目標／模組常數
 src/config/paths.ts        各平台（含 WSL）安裝路徑偵測
 src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules / errors

@@ -8,25 +8,60 @@
 
 A cross-platform (Linux / macOS / Windows / WSL) **localization and appearance tool for Google Antigravity**: Traditional Chinese (`zh-TW`), Simplified Chinese (`zh-CN`), Japanese (`ja`), Korean (`ko`) and custom backgrounds — **no commands to memorize**, just open the control panel and click.
 
-## 🚀 Fastest way: open the control panel
+## 🚀 Getting started
 
-Requires [Node.js 20+](https://nodejs.org/). In a terminal, run:
+### Option 1: download the single executable and double-click it (recommended)
+
+**No Node.js, no commands.** Download the file for your system from [Releases](https://github.com/Carinoasd/antigravity-i18n/releases/latest):
+
+| System | File |
+| --- | --- |
+| Windows (x64) | `antigravity-i18n-win-x64.exe` |
+| macOS (Apple silicon) | `antigravity-i18n-macos-arm64` |
+| Linux (x64) | `antigravity-i18n-linux-x64` |
+
+Double-click it and your browser opens the local control panel.
+
+- **Windows**: if SmartScreen shows "Windows protected your PC", click **More info → Run anyway**. The executable is not signed with a paid code-signing certificate, which is why this appears.
+- **macOS**: the first time, right-click the file in Finder → **Open**, then confirm. If it is still blocked, go to System Settings → Privacy & Security and click **Open Anyway**. Browsers may drop the executable bit: run `chmod +x antigravity-i18n-macos-arm64` first.
+- **Linux**: `chmod +x antigravity-i18n-linux-x64 && ./antigravity-i18n-linux-x64`
+- If something fails at startup, the window shows the error and waits for Enter before closing, so you can copy it into a bug report.
+
+**Verify the download (recommended)**: each Release includes `SHA256SUMS.txt`. Put it next to the executable:
+
+```bash
+# macOS
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
+```powershell
+# Windows (PowerShell): compare the hash with the matching line in SHA256SUMS.txt
+Get-FileHash .\antigravity-i18n-win-x64.exe -Algorithm SHA256
+```
+
+> The first Release is created automatically once the maintainer pushes a `v*` tag; until then, use option 2.
+
+### Option 2: run with npx (developers / Node.js already installed)
+
+Requires [Node.js 20+](https://nodejs.org/):
 
 ```bash
 npx github:Carinoasd/antigravity-i18n
 ```
 
-Your browser opens a local control panel where you can:
+> ⚠️ The npm package named `antigravity-i18n` is **not this project** (it belongs to another author). Use the `github:` form above, or install from source as shown below.
+
+### What the control panel does
 
 - Apply Traditional Chinese / Simplified Chinese / Japanese / Korean + background panel in one click
 - Keep the English UI and only add custom backgrounds plus the `Ctrl+Alt+B` panel
 - Restore the official build losslessly in one click
-- Apply one of 5 built-in gradient backgrounds and tune opacity / blur / tint
+- Apply one of 5 built-in gradients or choose an image from your computer, and tune opacity / blur / tint
 - Install or remove the Chinese AI global rule (zero-touch mode)
 
 > The control panel listens on `127.0.0.1` only and generates a new access token on every start, so no other computer or website can drive it. Click "Close control panel" or press `Ctrl+C` to stop it.
->
-> ⚠️ The npm package named `antigravity-i18n` is **not this project** (it belongs to another author). Use the `github:` form above, or install from source as shown below.
 
 ## Features
 

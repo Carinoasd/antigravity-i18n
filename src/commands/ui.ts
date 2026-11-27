@@ -75,6 +75,52 @@ export function openBrowser(url: string, opts: OpenBrowserOptions = {}): boolean
   }
 }
 
+/**
+ * 印出提示並等使用者按 Enter（只在互動式終端機中等待）。
+ * 用於單檔執行檔被雙擊開啟時：發生錯誤後若直接結束，Windows 的主控台視窗會一閃而過。
+ */
+export function waitForEnter(
+  prompt = '按 Enter 鍵結束…',
+  input: NodeJS.ReadableStream & { isTTY?: boolean } = process.stdin,
+  output: NodeJS.WritableStream = process.stdout,
+): Promise<void> {
+  if (!input.isTTY) return Promise.resolve();
+  output.write(`\n${prompt}`);
+  return new Promise((resolve) => {
+    const done = (): void => {
+      input.off('data', onData);
+      input.off('end', done);
+      (input as { pause?: () => void }).pause?.();
+      resolve();
+    };
+    const onData = (chunk: Buffer | string): void => {
+      if (String(chunk).includes('\n') || String(chunk).includes('\r')) done();
+    };
+    input.on('data', onData);
+    input.once('end', done);
+    (input as { resume?: () => void }).resume?.();
+  });
+}
+
+/**
+ * 不帶參數、在互動式終端機中啟動（例如雙擊單檔執行檔）時開啟控制台。
+ * 任何未預期的錯誤都印出清楚的訊息，並等使用者按 Enter 才結束。
+ */
+export async function launchInteractive(
+  start: () => Promise<number> = () => uiCommand({}),
+  wait: (prompt?: string) => Promise<void> = waitForEnter,
+): Promise<number> {
+  try {
+    return await start();
+  } catch (e) {
+    console.error(`\n${sym.fail} 無法啟動 Antigravity 中文化控制台：${e instanceof Error ? e.message : String(e)}`);
+    if (process.env.DEBUG && e instanceof Error && e.stack) console.error(e.stack);
+    console.error(pc.dim('  若問題持續發生，請到 https://github.com/Carinoasd/antigravity-i18n/issues 回報，並附上這段訊息。'));
+    await wait();
+    return 1;
+  }
+}
+
 export async function uiCommand(opts: UiCommandOptions = {}): Promise<number> {
   const port = parsePort(opts.port);
   const srv = await startUiServer({ port, toolHome: getToolHome(), userHome: os.homedir(), toolVersion: readToolVersion() });

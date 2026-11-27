@@ -1,0 +1,71 @@
+# 三平台單檔執行檔（Node.js SEA）打包與冒煙測試。
+# 由 ci.yml（PR 驗證）與 release.yml（發布）共用。
+name: Standalone executables
+
+on:
+  workflow_call:
+    inputs:
+      full-verify:
+        description: 打包前先跑 typecheck / test / validate
+        type: boolean
+        default: false
+      upload-artifacts:
+        description: 上傳打包出的執行檔
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: SEA / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            file: antigravity-i18n-win-x64.exe
+          - os: macos-latest
+            file: antigravity-i18n-macos-arm64
+          - os: ubuntu-latest
+            file: antigravity-i18n-linux-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      # 單檔執行檔內含打包時的 Node.js，一律以 Node 22 打包
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 完整驗證
+        if: inputs.full-verify
+        run: |
+          npm run typecheck
+          npm run build
+          npm test
+          node dist/cli.js validate
+
+      - name: 打包單檔執行檔
+        run: npm run build:sea
+
+      - name: 確認檔名與平台／架構相符
+        shell: bash
+        run: |
+          ls -la dist-sea
+          test -f "dist-sea/${{ matrix.file }}"
+
+      - name: 冒煙測試（實際執行編譯出的單檔執行檔）
+        run: node scripts/smoke-sea.mjs "dist-sea/${{ matrix.file }}"
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.upload-artifacts
+        with:
+          name: ${{ matrix.file }}
+          path: dist-sea/${{ matrix.file }}
+          if-no-files-found: error
+          retention-days: 7

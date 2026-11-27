@@ -30,7 +30,9 @@
     "test:watch": "vitest",
     "validate": "node dist/cli.js validate",
     "prepublishOnly": "npm run typecheck && npm run build && npm test && node dist/cli.js validate",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "build:sea": "node scripts/build-sea.mjs",
+    "smoke:sea": "node scripts/smoke-sea.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -65,8 +67,10 @@
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
     "@types/node": "^20.19.43",
+    "esbuild": "^0.28.2",
     "fake-indexeddb": "^6.2.8",
     "jsdom": "^26.1.0",
+    "postject": "^1.0.0-alpha.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
   }

@@ -9,17 +9,21 @@ import {
   type LocaleModule,
   type ProtectedTermsFile,
 } from '../types.js';
+import { EMBEDDED_LOCALES_DIR, embeddedKey, getEmbedded } from './embedded.js';
 
 /** 套件根目錄（src/core 與 dist/core 皆往上兩層） */
 export function packageRoot(): string {
   return fileURLToPath(new URL('../../', import.meta.url));
 }
 
+/** 詞庫目錄；單檔執行檔模式下為內嵌的虛擬目錄 */
 export function defaultLocalesDir(): string {
-  return path.join(packageRoot(), 'locales');
+  return getEmbedded() ? EMBEDDED_LOCALES_DIR : path.join(packageRoot(), 'locales');
 }
 
 export function readToolVersion(): string {
+  const embedded = getEmbedded();
+  if (embedded) return embedded.version;
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot(), 'package.json'), 'utf8')) as { version?: string };
     return pkg.version ?? '0.0.0';
@@ -53,6 +57,13 @@ export function moduleFile(dir: string, lang: Lang, mod: LocaleModule): string {
 }
 
 function readJson(file: string): unknown {
+  // 單檔執行檔：從內嵌資源讀取
+  const key = embeddedKey(file);
+  if (key !== null) {
+    const embedded = getEmbedded();
+    if (!embedded || !Object.prototype.hasOwnProperty.call(embedded.locales, key)) throw new LocaleError('找不到檔案', file);
+    return embedded.locales[key];
+  }
   let raw: string;
   try {
     raw = fs.readFileSync(file, 'utf8');
