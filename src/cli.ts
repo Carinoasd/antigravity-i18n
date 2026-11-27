@@ -14,7 +14,7 @@ import { CliError } from './commands/common.js';
 import { restoreCommand } from './commands/restore.js';
 import { rulesCommand } from './commands/rules.js';
 import { statusCommand } from './commands/status.js';
-import { shouldLaunchUi, uiCommand } from './commands/ui.js';
+import { launchInteractive, shouldLaunchUi, uiCommand } from './commands/ui.js';
 import { validateCommand } from './commands/validate.js';
 import { LocaleError, readToolVersion } from './core/locales.js';
 
@@ -161,12 +161,21 @@ async function run(fn: () => Promise<number>): Promise<void> {
   }
 }
 
-if (shouldLaunchUi(process.argv, process.env, Boolean(process.stdin.isTTY), Boolean(process.stdout.isTTY))) {
-  // 直接執行 antigravity-i18n（例如 npx）：在互動式終端機中開啟圖形控制台
-  await run(() => uiCommand({}));
-} else if (process.argv.length <= 2) {
-  // 非互動環境（CI、管線）：維持顯示說明
-  program.outputHelp();
-} else {
-  await program.parseAsync(process.argv);
+/** 不使用頂層 await：單檔執行檔以 CommonJS 打包 */
+async function main(): Promise<void> {
+  if (shouldLaunchUi(process.argv, process.env, Boolean(process.stdin.isTTY), Boolean(process.stdout.isTTY))) {
+    // 直接執行 antigravity-i18n（npx 或雙擊單檔執行檔）：在互動式終端機中開啟圖形控制台；
+    // 發生錯誤時印出訊息並等使用者按 Enter，避免視窗一閃而過
+    process.exitCode = await launchInteractive();
+  } else if (process.argv.length <= 2) {
+    // 非互動環境（CI、管線）：維持顯示說明
+    program.outputHelp();
+  } else {
+    await program.parseAsync(process.argv);
+  }
 }
+
+main().catch((e: unknown) => {
+  console.error(`${pc.red('✖')} ${e instanceof Error ? e.message : String(e)}`);
+  process.exitCode = 1;
+});

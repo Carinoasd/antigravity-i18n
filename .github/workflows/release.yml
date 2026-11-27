@@ -1,0 +1,73 @@
+# 推送 v* tag 時：三平台打包單檔執行檔、冒煙測試、產生 SHA256SUMS.txt 並建立 GitHub Release。
+# 手動執行（workflow_dispatch）時只打包並上傳 artifact，不建立 Release。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    name: 檢查版本號
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag 必須與 package.json 的版本一致
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          pkg="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          echo "package.json: $pkg / tag: $tag"
+          if [ "$pkg" != "$tag" ]; then
+            echo "::error::tag ($GITHUB_REF_NAME) 與 package.json 的版本 ($pkg) 不一致，請先更新 package.json 再打 tag"
+            exit 1
+          fi
+
+  build:
+    needs: check-version
+    uses: ./.github/workflows/sea.yml
+    with:
+      full-verify: true
+      upload-artifacts: true
+
+  publish:
+    name: 彙整與發布
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: 產生 SHA256SUMS.txt
+        working-directory: release
+        run: |
+          ls -la
+          test -f antigravity-i18n-win-x64.exe
+          test -f antigravity-i18n-macos-arm64
+          test -f antigravity-i18n-linux-x64
+          sha256sum antigravity-i18n-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: antigravity-i18n-standalone
+          path: release/*
+          if-no-files-found: error
+
+      - name: 建立 GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
