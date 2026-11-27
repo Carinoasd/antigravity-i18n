@@ -5,7 +5,7 @@
 ## 開發環境
 
 ```bash
-git clone https://github.com/<your-account>/antigravity-i18n.git
+git clone https://github.com/Carinoasd/antigravity-i18n.git
 cd antigravity-i18n
 npm install
 npm run typecheck

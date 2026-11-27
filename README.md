@@ -15,7 +15,7 @@
 需要 Node.js 20 以上。
 
 ```bash
-git clone https://github.com/<your-account>/antigravity-i18n.git
+git clone https://github.com/Carinoasd/antigravity-i18n.git
 cd antigravity-i18n
 npm install
 npm run build
