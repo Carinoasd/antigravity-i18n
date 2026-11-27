@@ -80,13 +80,17 @@ function withToolHome<T>(fn: () => Promise<T>): Promise<T> {
 // ─────────────────────────────────────────────────────────────
 
 describe('僅背景模式（--lang none）', () => {
-  it('parseApplyLang 接受 none，並有顯示名稱', () => {
+  it('parseApplyLang 接受 none 與四語系，並有顯示名稱', () => {
     expect(parseApplyLang('none')).toBe('none');
     expect(parseApplyLang('NONE')).toBe('none');
     expect(parseApplyLang('zh-tw')).toBe('zh-TW');
-    expect(() => parseApplyLang('ja')).toThrow(/none/);
+    expect(parseApplyLang('ja')).toBe('ja');
+    expect(parseApplyLang('ko')).toBe('ko');
+    expect(() => parseApplyLang('fr')).toThrow(/none/);
     expect(langLabel('none')).toBe('僅背景模式（none）');
     expect(langLabel('zh-CN')).toBe('zh-CN');
+    expect(langLabel('ja')).toBe('ja');
+    expect(langLabel('ko')).toBe('ko');
   });
 
   it('patcher：不翻譯、不寫入翻譯 runtime，只掛載背景掛鉤；restore 逐位元組還原', async () => {
@@ -345,9 +349,9 @@ describe('本機 HTTP server', () => {
   it('不合法的 JSON 與參數回傳 400', async () => {
     expect((await request(srv, { method: 'POST', path: '/api/apply', body: '{bad' })).status).toBe(400);
     expect((await request(srv, { method: 'POST', path: '/api/apply', body: '[1]' })).status).toBe(400);
-    const r = await request(srv, { method: 'POST', path: '/api/apply', body: { lang: 'ja' } });
+    const r = await request(srv, { method: 'POST', path: '/api/apply', body: { lang: 'fr' } });
     expect(r.status).toBe(400);
-    expect(r.json.error).toMatch(/zh-TW、zh-CN 或 none/);
+    expect(r.json.error).toMatch(/zh-TW、zh-CN、ja、ko 或 none/);
     expect((await request(srv, { method: 'POST', path: '/api/apply', body: { lang: 'none', target: 'ide' } })).status).toBe(400);
     expect((await request(srv, { method: 'POST', path: '/api/bg', body: { action: 'explode' } })).status).toBe(400);
     expect((await request(srv, { method: 'POST', path: '/api/bg', body: { action: 'preset', preset: 'rainbow' } })).json.error).toMatch(/未知的預設/);
@@ -367,7 +371,7 @@ describe('本機 HTTP server', () => {
     ]);
     expect(s.targets[0]!.installRoot).toBe(root);
     expect(s.presets).toHaveLength(5);
-    expect(s.rules).toHaveLength(2);
+    expect(s.rules).toHaveLength(4);
   });
 
   it('POST /api/apply：dry-run 不寫入任何檔案', async () => {
@@ -718,9 +722,11 @@ describe('ui 指令與無參數啟動', () => {
 });
 
 describe('控制台介面文字', () => {
-  it('繁中 / 简中 / EN 的 key 完全一致', () => {
+  it('繁中 / 简中 / 日本語 / 한국어 / EN 的 key 完全一致', () => {
     const tw = Object.keys(UI_TEXT['zh-TW']).sort();
     expect(Object.keys(UI_TEXT['zh-CN']).sort()).toEqual(tw);
+    expect(Object.keys(UI_TEXT.ja).sort()).toEqual(tw);
+    expect(Object.keys(UI_TEXT.ko).sort()).toEqual(tw);
     expect(Object.keys(UI_TEXT.en).sort()).toEqual(tw);
     for (const code of ['not-applied', 'no-runtime', 'old-hook']) expect(tw).toContain(`hint.${code}`);
   });
@@ -736,7 +742,7 @@ describe('控制台介面文字', () => {
   });
 
   it('提示文字引導點擊介面按鈕，而不是要求輸入指令', () => {
-    for (const lang of ['zh-TW', 'zh-CN', 'en'] as const) {
+    for (const lang of ['zh-TW', 'zh-CN', 'ja', 'ko', 'en'] as const) {
       for (const code of ['not-applied', 'no-runtime', 'old-hook']) {
         const text = UI_TEXT[lang][`hint.${code}`]!;
         expect(text).not.toMatch(/antigravity-i18n |--force|--lang/);

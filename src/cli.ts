@@ -22,11 +22,11 @@ const program = new Command();
 
 const targetOption = (): Option =>
   new Option('-t, --target <target>', '目標：app | ide | cli | all').default('all');
-const langOption = (): Option => new Option('-l, --lang <lang>', '語系：zh-TW | zh-CN');
+const langOption = (): Option => new Option('-l, --lang <lang>', '語系：zh-TW | zh-CN | ja | ko');
 
 program
   .name('antigravity-i18n')
-  .description('Google Antigravity 繁體中文（zh-TW）／簡體中文（zh-CN）中文化工具')
+  .description('Google Antigravity 繁體中文（zh-TW）／簡體中文（zh-CN）／日文（ja）／韓文（ko）多語系在地化與背景自訂工具')
   .version(readToolVersion(), '-v, --version', '顯示版本')
   .helpOption('-h, --help', '顯示說明')
   .addHelpCommand('help [command]', '顯示指令說明')
@@ -44,7 +44,7 @@ program
 program
   .command('apply')
   .description('套用中文化（自動備份原始檔並寫入 manifest）')
-  .addOption(new Option('-l, --lang <lang>', '語系：zh-TW | zh-CN | none（僅背景模式：只掛載背景與 Ctrl+Alt+B 面板，限 app）').makeOptionMandatory())
+  .addOption(new Option('-l, --lang <lang>', '語系：zh-TW | zh-CN | ja | ko | none（僅背景模式：只掛載背景與 Ctrl+Alt+B 面板，限 app）').makeOptionMandatory())
   .addOption(targetOption())
   .option('-p, --path <customPath>', '手動指定安裝路徑（需搭配單一 --target）')
   .option('--dry-run', '只預覽命中字串數與預計覆蓋率，不修改任何檔案')
@@ -143,7 +143,7 @@ program
 
 program
   .command('validate')
-  .description('CI 用詞庫驗證：JSON 語法、空值、zh-TW/zh-CN key 一致、佔位符與保護詞')
+  .description('CI 用詞庫驗證：JSON 語法、空值、多語系 key 一致、佔位符與保護詞')
   .option('-d, --dir <dir>', '詞庫目錄（預設為套件內建 locales/）')
   .action(async (opts) => run(() => validateCommand(opts)));
 

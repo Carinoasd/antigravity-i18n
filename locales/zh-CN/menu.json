@@ -68,5 +68,9 @@
   "Close": "关闭",
   "OK": "确定",
   "Cancel": "取消",
-  "Open": "打开"
+  "Open": "打开",
+  "Docs": "文档",
+  "Connect to WSL": "连接到 WSL",
+  "Reopen Locally": "在本地重新打开",
+  "No updates available": "没有可用的更新"
 }

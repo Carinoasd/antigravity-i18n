@@ -13,20 +13,20 @@ export class CliError extends Error {
 
 export function parseLang(input: string | undefined, required = true): Lang | undefined {
   if (input === undefined) {
-    if (required) throw new CliError('請以 --lang 指定語系：zh-TW 或 zh-CN');
+    if (required) throw new CliError('請以 --lang 指定語系：zh-TW、zh-CN、ja 或 ko');
     return undefined;
   }
   const lang = normalizeLang(input);
-  if (!lang) throw new CliError(`不支援的語系「${input}」，可用值：zh-TW、zh-CN`);
+  if (!lang) throw new CliError(`不支援的語系「${input}」，可用值：zh-TW、zh-CN、ja、ko`);
   return lang;
 }
 
-/** apply 用：除了 zh-TW / zh-CN，也接受 none（僅背景模式） */
+/** apply 用：除了 zh-TW / zh-CN / ja / ko，也接受 none（僅背景模式） */
 export function parseApplyLang(input: string | undefined): ApplyLang {
   if (input !== undefined && input.trim().toLowerCase() === 'none') return 'none';
-  if (input === undefined) throw new CliError('請以 --lang 指定語系：zh-TW、zh-CN，或 none（僅背景模式）');
+  if (input === undefined) throw new CliError('請以 --lang 指定語系：zh-TW、zh-CN、ja、ko，或 none（僅背景模式）');
   const lang = normalizeLang(input);
-  if (!lang) throw new CliError(`不支援的語系「${input}」，可用值：zh-TW、zh-CN、none（僅背景模式）`);
+  if (!lang) throw new CliError(`不支援的語系「${input}」，可用值：zh-TW、zh-CN、ja、ko、none（僅背景模式）`);
   return lang;
 }
 

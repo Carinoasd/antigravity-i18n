@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 
-跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 汉化与外观工具**：简体中文（`zh-CN`）、繁体中文（`zh-TW`）、自定义背景，**不用记命令**，打开图形控制台点一下就好。
+跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 多语言本地化与外观工具**：支持简体中文（`zh-CN`）、繁体中文（`zh-TW`）、日语（`ja`）、韩语（`ko`）与自定义背景，**不用记命令**，打开图形控制台点一下就好。
 
 ## 🚀 开始使用
 
@@ -55,7 +55,7 @@ npx github:Carinoasd/antigravity-i18n
 
 ### 控制台能做什么
 
-- 一键应用「简体中文＋背景面板」或「繁体中文＋背景面板」
+- 一键应用「简体中文 / 繁体中文 / 日语 / 韩语 ＋ 背景面板」
 - 只要自定义背景与 `Ctrl+Alt+B` 面板，保持英文界面
 - 一键无损还原官方原版
 - 应用 5 款内置渐变背景或选择电脑中的图片，调整不透明度／模糊／遮罩

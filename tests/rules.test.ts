@@ -24,10 +24,12 @@ describe('規則內容', () => {
   it('檔名', () => {
     expect(rulesFileName('zh-TW')).toBe('language-zh-tw.md');
     expect(rulesFileName('zh-CN')).toBe('language-zh-cn.md');
+    expect(rulesFileName('ja')).toBe('language-ja.md');
+    expect(rulesFileName('ko')).toBe('language-ko.md');
     expect(rulesFilePath(home, 'zh-TW')).toBe(path.join(home, '.gemini', 'config', 'rules', 'language-zh-tw.md'));
   });
 
-  it.each(['zh-TW', 'zh-CN'] as const)('%s 含正確的 YAML frontmatter', (lang) => {
+  it.each(['zh-TW', 'zh-CN', 'ja', 'ko'] as const)('%s 含正確的 YAML frontmatter', (lang) => {
     const text = renderRules(lang);
     expect(text.startsWith('---\ntrigger: always_on\n')).toBe(true);
     const fm = parseFrontmatter(text)!;
@@ -38,11 +40,15 @@ describe('規則內容', () => {
     expect(text).toContain('/plan');
   });
 
-  it('zh-TW 與 zh-CN 用語不同', () => {
+  it('各語系規則用語正確', () => {
     expect(renderRules('zh-TW')).toContain('繁體中文');
     expect(renderRules('zh-TW')).toContain('終端機');
     expect(renderRules('zh-CN')).toContain('简体中文');
     expect(renderRules('zh-CN')).toContain('命令面板');
+    expect(renderRules('ja')).toContain('日本語');
+    expect(renderRules('ja')).toContain('コマンドパレット');
+    expect(renderRules('ko')).toContain('한국어');
+    expect(renderRules('ko')).toContain('명령 팔레트');
   });
 });
 

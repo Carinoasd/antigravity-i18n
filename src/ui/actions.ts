@@ -90,7 +90,7 @@ function parseTargetList(input: unknown): TargetId[] {
 function parseApplyLang(input: unknown): ApplyLang {
   if (input === 'none') return 'none';
   const lang = typeof input === 'string' ? normalizeLang(input) : null;
-  if (!lang) throw new RequestError('lang 必須是 zh-TW、zh-CN 或 none');
+  if (!lang) throw new RequestError('lang 必須是 zh-TW、zh-CN、ja、ko 或 none');
   return lang;
 }
 
@@ -359,7 +359,7 @@ export function runRules(ctx: ActionContext, body: Record<string, unknown>): { o
   const action = body.action;
   if (action === 'install') {
     const lang = typeof body.lang === 'string' ? normalizeLang(body.lang) : 'zh-TW';
-    if (!lang) throw new RequestError('lang 必須是 zh-TW 或 zh-CN');
+    if (!lang) throw new RequestError('lang 必須是 zh-TW、zh-CN、ja 或 ko');
     try {
       const result = installRules(ctx.userHome, lang, { force: body.force === true });
       return { ok: true, action, result, status: rulesStatus(ctx.userHome) };

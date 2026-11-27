@@ -1,7 +1,7 @@
 {
   "name": "antigravity-i18n",
   "version": "0.1.0",
-  "description": "跨平台 Google Antigravity 繁體中文（zh-TW）與簡體中文（zh-CN）中文化 CLI 工具",
+  "description": "跨平台 Google Antigravity 多語系（繁中／簡中／日文／韓文）在地化與背景自訂工具",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Carinoasd/antigravity-i18n.git"
@@ -43,7 +43,12 @@
     "l10n",
     "zh-TW",
     "zh-CN",
+    "ja",
+    "ko",
     "chinese",
+    "japanese",
+    "korean",
+    "cjk",
     "localization",
     "electron",
     "asar",
