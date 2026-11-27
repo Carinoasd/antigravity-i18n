@@ -83,5 +83,11 @@
   "Retired": "已结束",
   "Search members": "搜索成员",
   "Jump to approvals": "跳转至待批准项",
-  "No swarm in this conversation": "此对话当前没有多代理协作"
+  "No swarm in this conversation": "此对话当前没有多代理协作",
+  "No Project": "无项目",
+  "Ask anything, @ to mention, / for actions": "询问任何问题，输入 @ 以提及、/ 以执行操作",
+  "Good to see you, {name}. What's next?": "很高兴见到你，{name}。接下来要做什么？",
+  "Build me a web app": "帮我构建一个 Web 应用",
+  "Add a Gemini feature to my app": "为我的应用添加 Gemini 功能",
+  "Bring over my setup from other Agentic Developer Tools": "从其他 Agentic 开发工具导入我的设置"
 }

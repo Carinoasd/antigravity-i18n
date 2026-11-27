@@ -72,5 +72,6 @@
   "Docs": "說明文件",
   "Connect to WSL": "連線至 WSL",
   "Reopen Locally": "在本機重新開啟",
-  "No updates available": "沒有可用的更新"
+  "No updates available": "沒有可用的更新",
+  "Workspace": "工作區"
 }

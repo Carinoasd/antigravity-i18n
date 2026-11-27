@@ -72,5 +72,6 @@
   "Docs": "文档",
   "Connect to WSL": "连接到 WSL",
   "Reopen Locally": "在本地重新打开",
-  "No updates available": "没有可用的更新"
+  "No updates available": "没有可用的更新",
+  "Workspace": "工作区"
 }

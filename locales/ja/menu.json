@@ -72,5 +72,6 @@
   "Docs": "ドキュメント",
   "Connect to WSL": "WSL に接続",
   "Reopen Locally": "ローカルで開き直す",
-  "No updates available": "利用可能なアップデートはありません"
+  "No updates available": "利用可能なアップデートはありません",
+  "Workspace": "ワークスペース"
 }
