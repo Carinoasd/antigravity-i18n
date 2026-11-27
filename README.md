@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 
-跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 中文化與外觀工具**：繁體中文（`zh-TW`）、簡體中文（`zh-CN`）、自訂背景，**不用背指令**，打開圖形控制台按一下就好。
+跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 多語系在地化與外觀工具**：支援繁體中文（`zh-TW`）、簡體中文（`zh-CN`）、日文（`ja`）、韓文（`ko`）與自訂背景，**不用背指令**，打開圖形控制台按一下就好。
 
 ## 🚀 最快的方式：直接開啟圖形控制台
 
@@ -18,7 +18,7 @@ npx github:Carinoasd/antigravity-i18n
 
 瀏覽器會自動打開本機控制台，可以：
 
-- 一鍵套用「繁體中文＋背景面板」或「簡體中文＋背景面板」
+- 一鍵套用「繁體中文 / 簡體中文 / 日文 / 韓文 ＋ 背景面板」
 - 只要自訂背景與 `Ctrl+Alt+B` 面板、維持英文介面
 - 一鍵無損還原官方原版
 - 套用 5 款內建漸層背景、調整不透明度／模糊／遮罩

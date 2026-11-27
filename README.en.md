@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 
-A cross-platform (Linux / macOS / Windows / WSL) **localization and appearance tool for Google Antigravity**: Traditional Chinese (`zh-TW`), Simplified Chinese (`zh-CN`) and custom backgrounds — **no commands to memorize**, just open the control panel and click.
+A cross-platform (Linux / macOS / Windows / WSL) **localization and appearance tool for Google Antigravity**: Traditional Chinese (`zh-TW`), Simplified Chinese (`zh-CN`), Japanese (`ja`), Korean (`ko`) and custom backgrounds — **no commands to memorize**, just open the control panel and click.
 
 ## 🚀 Fastest way: open the control panel
 
@@ -18,7 +18,7 @@ npx github:Carinoasd/antigravity-i18n
 
 Your browser opens a local control panel where you can:
 
-- Apply "Traditional Chinese + background panel" or "Simplified Chinese + background panel" in one click
+- Apply Traditional Chinese / Simplified Chinese / Japanese / Korean + background panel in one click
 - Keep the English UI and only add custom backgrounds plus the `Ctrl+Alt+B` panel
 - Restore the official build losslessly in one click
 - Apply one of 5 built-in gradient backgrounds and tune opacity / blur / tint

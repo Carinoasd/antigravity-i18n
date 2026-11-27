@@ -5,7 +5,7 @@
 
 ## 專案概要
 
-`antigravity-i18n` 是 Google Antigravity 的繁體中文（`zh-TW`）／簡體中文（`zh-CN`）中文化 CLI。
+`antigravity-i18n` 是 Google Antigravity 的多語系（`zh-TW` / `zh-CN` / `ja` / `ko`）在地化與背景自訂 CLI。
 它會**修改使用者電腦上的應用程式檔案**，因此安全性與可還原性優先於一切。
 
 | 目標 | 機制 |
@@ -94,7 +94,7 @@ node dist/cli.js validate
 | Message | 訊息 | 消息 |
 | Server | 伺服器 | 服务器 |
 
-- `zh-TW` 與 `zh-CN` 每個模組的 **key 必須完全一致**；新增字串時兩邊同時加。
+- 所有支援語系（`zh-TW`、`zh-CN`、`ja`、`ko`）每個模組的 **key 必須完全一致**；新增字串時四邊同時加。
 - key 是英文原文，必須與介面上的字串**完全相同**（大小寫、標點、省略號）。
 - 佔位符（`{name}`、`%s`、`%d`）的種類與數量必須與原文一致。
 - 保護詞（`locales/protected-terms.json`：`/plan`、`/swarm`、MCP、Git、SSH、Diff、Worktree、Agent 等）原樣保留。
