@@ -546,10 +546,14 @@ describe('本機 HTTP server：WSL 上傳鏡像', () => {
       const cfg = JSON.parse(fs.readFileSync(path.join(winHome, '.antigravity-i18n', 'background.json'), 'utf8'));
       // 真實 WSL 中鏡像位於 /mnt/c/... → C:\...；測試的暫存路徑則換算成 UNC（Windows runner 上無法換算）
       const expected = wslToWindowsPath(mirrorImage, 'Ubuntu');
-      if (expected) expect(cfg.windowsPath).toBe(expected);
-      else expect(cfg.windowsPath).toBeUndefined();
-      // 已複製到 Windows 側，不需要再提醒「圖片位於 WSL 檔案系統」
-      expect((r.json.warnings as string[]).some((w) => w.includes('WSL 檔案系統'))).toBe(false);
+      if (expected) {
+        expect(cfg.windowsPath).toBe(expected);
+        // 已複製到 Windows 側並記錄其路徑，不需要再提醒「圖片位於 WSL 檔案系統」
+        expect((r.json.warnings as string[]).some((w) => w.includes('WSL 檔案系統'))).toBe(false);
+      } else {
+        // Windows runner 的暫存路徑本身就是 C:\...，不是 WSL 會出現的路徑，無法換算
+        expect(cfg.windowsPath).toBeUndefined();
+      }
     } finally {
       await srv.close();
     }
