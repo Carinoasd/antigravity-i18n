@@ -8,25 +8,60 @@
 
 跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 中文化與外觀工具**：繁體中文（`zh-TW`）、簡體中文（`zh-CN`）、自訂背景，**不用背指令**，打開圖形控制台按一下就好。
 
-## 🚀 最快的方式：直接開啟圖形控制台
+## 🚀 開始使用
 
-需要 [Node.js 20 以上](https://nodejs.org/)。在終端機執行：
+### 方法一：下載單檔執行檔，雙擊開啟（推薦一般使用者）
+
+**免裝 Node.js、免打指令。** 到 [Releases](https://github.com/Carinoasd/antigravity-i18n/releases/latest) 下載對應的檔案：
+
+| 系統 | 檔案 |
+| --- | --- |
+| Windows（x64） | `antigravity-i18n-win-x64.exe` |
+| macOS（Apple 晶片） | `antigravity-i18n-macos-arm64` |
+| Linux（x64） | `antigravity-i18n-linux-x64` |
+
+雙擊開啟後，瀏覽器會自動打開本機圖形控制台。
+
+- **Windows**：出現「Windows 已保護您的電腦」（SmartScreen）時，按「**其他資訊** → **仍要執行**」。執行檔沒有付費的程式碼簽章，所以會出現這個提示。
+- **macOS**：第一次請在 Finder 對檔案按**右鍵 → 打開**，再按「打開」；若仍被擋下，到「系統設定 → 隱私權與安全性」按「**強制打開**」。從瀏覽器下載的檔案可能失去執行權限，可先執行 `chmod +x antigravity-i18n-macos-arm64`。
+- **Linux**：`chmod +x antigravity-i18n-linux-x64 && ./antigravity-i18n-linux-x64`
+- 若啟動時發生錯誤，視窗會顯示錯誤訊息並等你按 Enter 才關閉，方便截圖回報。
+
+**驗證檔案（建議）**：同一個 Release 附有 `SHA256SUMS.txt`，把它和執行檔放在同一個資料夾：
+
+```bash
+# macOS
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
+```powershell
+# Windows（PowerShell）：比對輸出的雜湊與 SHA256SUMS.txt 中的那一行
+Get-FileHash .\antigravity-i18n-win-x64.exe -Algorithm SHA256
+```
+
+> 第一個 Release 會在維護者推送 `v*` tag 後自動建立；在那之前請使用方法二。
+
+### 方法二：用 npx 執行（開發者／已安裝 Node.js）
+
+需要 [Node.js 20 以上](https://nodejs.org/)：
 
 ```bash
 npx github:Carinoasd/antigravity-i18n
 ```
 
-瀏覽器會自動打開本機控制台，可以：
+> ⚠️ npm 上名為 `antigravity-i18n` 的套件**不是本專案**（屬於另一位作者）。請使用上面的 `github:` 寫法，或依下方步驟從原始碼安裝。
+
+### 控制台可以做什麼
 
 - 一鍵套用「繁體中文＋背景面板」或「簡體中文＋背景面板」
 - 只要自訂背景與 `Ctrl+Alt+B` 面板、維持英文介面
 - 一鍵無損還原官方原版
-- 套用 5 款內建漸層背景、調整不透明度／模糊／遮罩
+- 套用 5 款內建漸層背景或選擇電腦中的圖片，調整不透明度／模糊／遮罩
 - 安裝或移除中文 AI 全域規則（零侵入模式）
 
 > 控制台只監聽 `127.0.0.1`，每次啟動都會產生新的存取 Token，其他電腦或網站都無法操作。按「關閉控制台」或 `Ctrl+C` 即可結束。
->
-> ⚠️ npm 上名為 `antigravity-i18n` 的套件**不是本專案**（屬於另一位作者）。請使用上面的 `github:` 寫法，或依下方步驟從原始碼安裝。
 
 - 🖥️ 支援 Antigravity **App**（桌面版 2.0+，`app.asar`）、**IDE**（編輯器與 Agent 面板）、**CLI**（`agy`）
 - 🧩 App 採**雙層機制**：靜態翻譯主行程選單／系統匣／更新提示，加上**執行期 DOM 注入層**即時翻譯動態載入的 React UI
@@ -511,6 +546,15 @@ tests/                     # vitest 單元測試
 ```
 
 ## 開發
+
+自行打包單檔執行檔（需要 Node.js 22；產出在 `dist-sea/`）：
+
+```bash
+npm run build:sea
+npm run smoke:sea -- dist-sea/antigravity-i18n-linux-x64   # 依平台調整檔名
+```
+
+推送 `v*` tag（必須與 `package.json` 的版本一致）會由 GitHub Actions 在三平台打包、冒煙測試，並自動建立附有 `SHA256SUMS.txt` 的 Release。
 
 開發規範、繁簡用語準則與分支協作原則請見 [AGENTS.md](./AGENTS.md)（Claude Code 透過 `CLAUDE.md` 引用同一份）。
 
