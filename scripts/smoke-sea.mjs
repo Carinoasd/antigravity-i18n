@@ -83,6 +83,15 @@ async function makeFakeApp() {
   const appRoot = path.join(tmp, 'Antigravity');
   const asarPath = path.join(appRoot, 'resources', 'app.asar');
   await packAsar(src, asarPath);
+  // 假的 Antigravity 執行檔（launch 用）：Linux 為會寫入標記檔的 shell 腳本；
+  // Windows 複製 node.exe（stdin 為 ignore 時會立即結束）
+  if (process.platform === 'win32') {
+    fs.copyFileSync(process.execPath, path.join(appRoot, 'Antigravity.exe'));
+  } else {
+    const exe = path.join(appRoot, 'antigravity');
+    fs.writeFileSync(exe, '#!/bin/sh\necho launched > "$AGI18N_SMOKE_MARKER"\n');
+    fs.chmodSync(exe, 0o755);
+  }
   return { appRoot, asarPath };
 }
 
@@ -95,7 +104,14 @@ await step(`--version 為 ${version}`, () => {
 
 await step('--help 列出主要指令', () => {
   const r = exec(['--help']);
-  for (const c of ['apply', 'restore', 'bg', 'ui', 'validate']) assert(r.out.includes(c), `缺少 ${c}：${r.out}`);
+  for (const c of ['apply', 'restore', 'bg', 'launch', 'shortcut', 'ui', 'validate']) assert(r.out.includes(c), `缺少 ${c}：${r.out}`);
+});
+
+await step('launch --help / shortcut --help', () => {
+  const l = exec(['launch', '--help']);
+  assert(l.code === 0 && l.out.includes('--no-reapply'), `exit=${l.code}\n${l.out}`);
+  const s = exec(['shortcut', '--help']);
+  assert(s.code === 0 && s.out.includes('install | remove | status'), `exit=${s.code}\n${s.out}`);
 });
 
 await step('不帶參數（非互動）顯示說明而不啟動 server', () => {
@@ -170,6 +186,52 @@ await step('apply + bg preset，並在模擬的 Electron 與 jsdom 中執行注�
   assert(doc.getElementById('antigravity-i18n-bg')?.getAttribute('data-preset') === 'aurora', '背景沒有生效');
   doc.body.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'b', code: 'KeyB', ctrlKey: true, altKey: true, bubbles: true }));
   assert(doc.getElementById('antigravity-i18n-panel').hidden === false, 'Ctrl+Alt+B 沒有開啟面板');
+
+  // 面板的「掃描未翻譯英文」：已翻譯的 Settings 不列入，新的英文字串列入
+  const extra = doc.createElement('span');
+  extra.textContent = 'Smoke untranslated label';
+  doc.body.appendChild(extra);
+  doc.querySelector('[data-agi18n="scan"]').click();
+  assert(doc.querySelector('[data-agi18n="scan-count"]').textContent === '找到 1 筆', `掃描結果：${doc.querySelector('[data-agi18n="scan-count"]').textContent}`);
+  assert(JSON.parse(dom.window.__ANTIGRAVITY_I18N_PANEL__.scanJson())['Smoke untranslated label'] === '', 'scanJson 格式錯誤');
+});
+
+// macOS 的 launch 會呼叫系統的 open -a，冒煙測試只在 Linux / Windows 實際啟動假的執行檔
+await step('launch：偵測到 app.asar 被官方更新覆蓋時自動重新套用，再啟動 Antigravity', async () => {
+  if (process.platform === 'darwin') return;
+  const marker = path.join(tmp, 'launched.txt');
+  const launchEnv = { ...env, AGI18N_SMOKE_MARKER: marker };
+  const fresh = exec(['launch', '--path', appRoot], { env: launchEnv });
+  assert(fresh.code === 0 && fresh.out.includes('已是最新修補狀態'), `exit=${fresh.code}\n${fresh.out}`);
+  // 模擬官方自動更新：app.asar 被換回未翻譯的版本
+  fs.writeFileSync(asarPath, original);
+  const r = exec(['launch', '--path', appRoot], { env: launchEnv });
+  assert(r.code === 0 && r.out.includes('已重新套用'), `exit=${r.code}\n${r.out}`);
+  asar.uncacheAll();
+  assert(asar.extractFile(asarPath, path.join('dist', 'menu.js')).toString().includes('label:"設定"'), '重新套用後沒有翻譯');
+  if (process.platform !== 'win32') {
+    for (let i = 0; i < 50 && !fs.existsSync(marker); i++) await new Promise((res) => setTimeout(res, 100));
+    assert(fs.existsSync(marker), '沒有啟動假的 Antigravity 執行檔');
+  }
+});
+
+await step('shortcut install / status / remove（寫入暫存目錄）', () => {
+  const desk = path.join(tmp, 'desktop');
+  const i = exec(['shortcut', 'install', '--dir', desk, '--path', appRoot, '--lang', 'zh-TW']);
+  assert(i.code === 0 && i.out.includes('已建立捷徑'), `exit=${i.code}\n${i.out}`);
+  const files = fs.readdirSync(desk);
+  assert(files.length === 1, `捷徑檔案：${files.join(', ')}`);
+  const file = path.join(desk, files[0]);
+  if (process.platform !== 'win32') {
+    const text = fs.readFileSync(file, 'utf8');
+    assert(text.includes('launch --lang zh-TW --path'), `捷徑內容沒有 launch：\n${text}`);
+    // 單檔執行檔直接執行自己；esbuild bundle 需要帶上 bundle 路徑
+    for (const a of [cmd, ...baseArgs]) assert(text.includes(a), `捷徑沒有指向 ${a}：\n${text}`);
+  }
+  const st = exec(['shortcut', 'status', '--dir', desk, '--path', appRoot]);
+  assert(st.code === 0 && st.out.includes('已建立'), `exit=${st.code}\n${st.out}`);
+  const rm = exec(['shortcut', 'remove', '--dir', desk, '--path', appRoot]);
+  assert(rm.code === 0 && fs.readdirSync(desk).length === 0, `exit=${rm.code}\n${rm.out}`);
 });
 
 await step('restore 逐位元組還原', () => {

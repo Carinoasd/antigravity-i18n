@@ -14,6 +14,8 @@ import {
   type WslContext,
 } from '../core/background.js';
 import { FileLockError, explainFsError } from '../core/errors.js';
+import { resolveLaunchTarget } from '../core/launcher.js';
+import { ShortcutError, defaultShortcutEnv, installShortcut, removeShortcut, shortcutStatus, type ShortcutEnv, type ShortcutResult } from '../core/shortcut.js';
 import { loadDictionary, normalizeLang } from '../core/locales.js';
 import { applyTarget, inspectManifest, inspectTarget, restoreManifest, type ApplyStatus, type TargetState } from '../core/patcher.js';
 import { BACKGROUND_PRESETS } from '../core/presets.js';
@@ -38,6 +40,8 @@ export interface ActionContext {
   /** WSL 狀態；undefined 表示自動偵測，null 表示非 WSL */
   wsl?: WslContext | null;
   archiver?: AsarArchiver;
+  /** 桌面捷徑的平台環境（測試時注入暫存目錄與假的 PowerShell）；未指定時以 userHome 為家目錄 */
+  shortcutEnv?: ShortcutEnv;
 }
 
 export type TargetPaths = Partial<Record<TargetId, string>>;
@@ -373,4 +377,37 @@ export function runRules(ctx: ActionContext, body: Record<string, unknown>): { o
     return { ok: result.skipped.length === 0, action, result, status: rulesStatus(ctx.userHome) };
   }
   throw new RequestError('action 必須是 install 或 remove');
+}
+
+// ── 桌面捷徑 ──────────────────────────────────────────
+
+export type ShortcutAction = 'install' | 'remove' | 'status';
+
+export interface ShortcutResponse {
+  ok: true;
+  shortcut: ShortcutResult;
+}
+
+function shortcutEnvOf(ctx: ActionContext): ShortcutEnv {
+  return ctx.shortcutEnv ?? defaultShortcutEnv(ctx.userHome);
+}
+
+/** 控制台「桌面捷徑」：建立、移除或查詢指向 launch 的捷徑 */
+export function runShortcut(ctx: ActionContext, action: ShortcutAction, body: Record<string, unknown>): ShortcutResponse {
+  const name = body.name === undefined || body.name === '' ? undefined : body.name;
+  if (name !== undefined && typeof name !== 'string') throw new RequestError('name 必須是字串');
+  const lang = body.lang === undefined || body.lang === '' || body.lang === 'auto' ? undefined : parseApplyLang(body.lang);
+  const appPath = cleanPaths(body.paths).app;
+  const detect = detectOf(ctx);
+  const root = resolveLaunchTarget({ toolHome: ctx.toolHome, detect: (p) => detect('app', p) }, appPath)?.installRoot;
+  const opts = { name, lang, path: appPath, force: body.force === true };
+  try {
+    const env = shortcutEnvOf(ctx);
+    const shortcut =
+      action === 'install' ? installShortcut(opts, env, root) : action === 'remove' ? removeShortcut(opts, env, root) : shortcutStatus(opts, env, root);
+    return { ok: true, shortcut };
+  } catch (e) {
+    if (e instanceof ShortcutError) throw new RequestError(e.message, 409);
+    throw e;
+  }
 }

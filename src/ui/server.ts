@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { RequestError, collectStatus, runApply, runBg, runBgUpload, runRestore, runRules, toFriendly, type ActionContext } from './actions.js';
+import { RequestError, collectStatus, runApply, runBg, runBgUpload, runRestore, runRules, runShortcut, toFriendly, type ActionContext } from './actions.js';
 import { MAX_IMAGE_BYTES } from '../core/background.js';
 import { renderUiHtml } from './html.js';
 import { HOOK_VERSION } from '../core/runtime.js';
@@ -119,6 +119,7 @@ export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
     detect: opts.detect,
     wsl: opts.wsl,
     archiver: opts.archiver,
+    shortcutEnv: opts.shortcutEnv,
   };
   let port = 0;
   let busy = false;
@@ -196,6 +197,12 @@ export async function startUiServer(opts: UiServerOptions): Promise<UiServer> {
         }
         case 'POST /api/rules':
           return reply(200, runRules(ctx, await readJson(req)));
+        case 'GET /api/shortcut':
+          return reply(200, runShortcut(ctx, 'status', { name: url.searchParams.get('name') ?? undefined, paths: { app: url.searchParams.get('app') ?? undefined } }));
+        case 'POST /api/shortcut/install':
+          return reply(200, runShortcut(ctx, 'install', await readJson(req)));
+        case 'POST /api/shortcut/remove':
+          return reply(200, runShortcut(ctx, 'remove', await readJson(req)));
         case 'POST /api/shutdown':
           reply(200, { ok: true, message: '控制台已關閉' });
           setImmediate(() => void close());

@@ -296,6 +296,9 @@ describe('本機 HTTP server', () => {
     ['POST', '/api/restore'],
     ['POST', '/api/bg'],
     ['POST', '/api/rules'],
+    ['GET', '/api/shortcut'],
+    ['POST', '/api/shortcut/install'],
+    ['POST', '/api/shortcut/remove'],
     ['POST', '/api/shutdown'],
   ])('%s %s：缺少或錯誤 Token 回傳 403', async (method, p) => {
     const body = method === 'GET' ? undefined : {};
