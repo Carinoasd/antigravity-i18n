@@ -129,10 +129,11 @@ describe('launch：平台啟動指令（純函式）', () => {
     expect(() => launchCommandFor(root, { platform: 'win32', wsl: false, exists: () => false })).toThrow(LaunchError);
   });
 
-  it('macOS：open -a <installRoot>', () => {
+  it('macOS：open -a <installRoot>（等待包裝程式結束）', () => {
     const c = launchCommandFor('/Applications/Antigravity App.app', { platform: 'darwin', wsl: false, exists: () => false });
     expect(c.cmd).toBe('open');
     expect(c.args).toEqual(['-a', '/Applications/Antigravity App.app']);
+    expect(c.waitForExit).toBe(true);
   });
 
   it('Linux：偵測 antigravity / Antigravity 執行檔', () => {
@@ -141,13 +142,14 @@ describe('launch：平台啟動指令（純函式）', () => {
     expect(() => launchCommandFor('/opt/ag', { platform: 'linux', wsl: false, exists: () => false })).toThrow(/找不到 antigravity 執行檔/);
   });
 
-  it('WSL：/mnt/c 下的安裝轉成 Windows 路徑，以 cmd.exe /c start "" 啟動', () => {
+  it('WSL：/mnt/c 下的安裝轉成 Windows 路徑，以 cmd.exe /c start "" 啟動並等待 cmd.exe 結束', () => {
     const root = '/mnt/c/Users/me/AppData/Local/Programs/Antigravity';
     const env: LaunchEnv = { platform: 'linux', wsl: true, exists: has(`${root}/Antigravity.exe`, '/mnt/c/Windows/System32/cmd.exe', '/mnt/c') };
     const c = launchCommandFor(root, env);
     expect(c.cmd).toBe('/mnt/c/Windows/System32/cmd.exe');
     expect(c.args).toEqual(['/d', '/c', 'start', '', 'C:\\Users\\me\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe']);
     expect(c.cwd).toBe('/mnt/c');
+    expect(c.waitForExit).toBe(true);
     // 非 WSL 的 Linux 不會走 cmd.exe
     expect(() => launchCommandFor(root, { ...env, wsl: false })).toThrow(LaunchError);
   });
@@ -159,13 +161,37 @@ describe('launch：平台啟動指令（純函式）', () => {
     }
   });
 
-  it('spawnDetached：detached + stdio ignore + unref；spawn 失敗時 reject', async () => {
+  it('spawnDetached：直接執行本體採 detached + unref；waitForExit（WSL / macOS）等待 exit 並檢查狀態碼', async () => {
     const ok = mockSpawn();
     await spawnDetached({ cmd: '/x/antigravity', args: ['--a'], display: '' }, ok.spawn);
     expect(ok.calls).toHaveLength(1);
     expect(ok.calls[0]).toMatchObject({ cmd: '/x/antigravity', args: ['--a'], opts: { detached: true, stdio: 'ignore' }, unref: 1 });
     const bad = mockSpawn(new Error('ENOENT'));
     await expect(spawnDetached({ cmd: '/nope', args: [], display: '' }, bad.spawn)).rejects.toThrow('ENOENT');
+
+    // waitForExit：不在 spawn 就提早結束，而是等 exit(0)；非 0 則拋出 LaunchError
+    const waitCalls: SpawnCall[] = [];
+    const waitSpawn = (code: number | null): Spawn => (cmd, args, opts) => {
+      const call: SpawnCall = { cmd, args, opts, unref: 0 };
+      waitCalls.push(call);
+      const child = new EventEmitter() as EventEmitter & ChildLike;
+      child.unref = () => void call.unref++;
+      process.nextTick(() => {
+        child.emit('spawn');
+        setTimeout(() => child.emit('exit', code, null), 10);
+      });
+      return child;
+    };
+    let resolvedEarly = false;
+    const p = spawnDetached({ cmd: '/mnt/c/Windows/System32/cmd.exe', args: ['/d', '/c', 'start', '', 'C:\\app.exe'], display: 'cmd', waitForExit: true }, waitSpawn(0)).then(() => {
+      resolvedEarly = true;
+    });
+    await new Promise((r) => setTimeout(r, 2));
+    expect(resolvedEarly).toBe(false);
+    await p;
+    expect(resolvedEarly).toBe(true);
+    expect(waitCalls[0]).toMatchObject({ opts: { detached: false, stdio: 'ignore', windowsHide: true }, unref: 0 });
+    await expect(spawnDetached({ cmd: 'cmd.exe', args: [], display: 'cmd', waitForExit: true }, waitSpawn(1))).rejects.toThrow(LaunchError);
   });
 });
 

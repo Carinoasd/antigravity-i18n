@@ -36,6 +36,13 @@ export interface LaunchCommand {
   cwd?: string;
   /** 給使用者看的說明 */
   display: string;
+  /**
+   * 啟動指令本身是短命包裝程式（WSL `cmd.exe /d /c start`、macOS `open -a`）時設為 true：
+   * 等待包裝程式結束（數十至兩百毫秒，已把 GUI App 獨立拉起）再離開，
+   * 避免 WSL 桌面捷徑中 `wsl.exe` 在 `node` 瞬間結束時拆掉 `WSL_INTEROP` socket、
+   * 導致 Windows 端還沒來得及啟動 `cmd.exe` 就被中斷。
+   */
+  waitForExit?: boolean;
 }
 
 export interface LaunchEnv {
@@ -91,7 +98,7 @@ export function launchCommandFor(installRoot: string, env: LaunchEnv): LaunchCom
     return { cmd: exe, args: [], display: exe };
   }
   if (env.platform === 'darwin') {
-    return { cmd: 'open', args: ['-a', installRoot], display: `open -a "${installRoot}"` };
+    return { cmd: 'open', args: ['-a', installRoot], display: `open -a "${installRoot}"`, waitForExit: true };
   }
   if (env.platform === 'linux' && env.wsl && isWslWindowsPath(installRoot)) {
     // WSL + Windows 側安裝：轉成 Windows 路徑，交給 cmd.exe 的 start 啟動（脫離 WSL 工作階段）
@@ -106,6 +113,7 @@ export function launchCommandFor(installRoot: string, env: LaunchEnv): LaunchCom
       args: ['/d', '/c', 'start', '', winExe],
       cwd: env.exists('/mnt/c') ? '/mnt/c' : undefined,
       display: `cmd.exe /c start "" "${winExe}"`,
+      waitForExit: true,
     };
   }
   for (const root of rootCandidates(installRoot, path.posix)) {
@@ -121,12 +129,13 @@ export function launchCommandFor(installRoot: string, env: LaunchEnv): LaunchCom
 
 export interface ChildLike {
   once(event: 'spawn', fn: () => void): unknown;
+  once(event: 'exit', fn: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
   once(event: 'error', fn: (e: Error) => void): unknown;
   unref(): void;
 }
 
 export interface SpawnOptionsLike {
-  detached: true;
+  detached: boolean;
   stdio: 'ignore';
   cwd?: string;
   windowsHide?: boolean;
@@ -137,30 +146,45 @@ export type Spawn = (cmd: string, args: string[], opts: SpawnOptionsLike) => Chi
 export const defaultSpawn: Spawn = (cmd, args, opts) => nodeSpawn(cmd, args, opts);
 
 /**
- * 以 detached 方式啟動並 `unref()`，讓本工具可以立刻結束、不影響 Antigravity。
- * 等到子行程確實建立（spawn 事件）或失敗（error 事件）才 resolve，通常只需數毫秒。
+ * 啟動 Antigravity：
+ * - 直接執行本體（Windows / Linux）：以 detached + `unref()` 啟動，收到 `spawn` 即結束。
+ * - 短命包裝程式（WSL `cmd.exe /d /c start`、macOS `open -a`）：等待包裝程式退出（`exit`），
+ *   確保 GUI App 確實已經交給作業系統啟動，再結束本工具（特別防止 WSL 提前拆掉 interop socket）。
  */
 export function spawnDetached(c: LaunchCommand, spawn: Spawn = defaultSpawn): Promise<void> {
   return new Promise((resolve, reject) => {
+    const wait = c.waitForExit === true;
     let child: ChildLike;
     try {
-      child = spawn(c.cmd, c.args, { detached: true, stdio: 'ignore', ...(c.cwd ? { cwd: c.cwd } : {}), windowsHide: false });
+      child = spawn(c.cmd, c.args, {
+        detached: !wait,
+        stdio: 'ignore',
+        ...(c.cwd ? { cwd: c.cwd } : {}),
+        windowsHide: wait,
+      });
     } catch (e) {
       reject(e);
       return;
     }
     let done = false;
-    child.once('spawn', () => {
+    const finish = (err?: unknown): void => {
       if (done) return;
       done = true;
-      child.unref();
-      resolve();
-    });
-    child.once('error', (e) => {
-      if (done) return;
-      done = true;
-      reject(e);
-    });
+      if (err !== undefined) reject(err);
+      else resolve();
+    };
+    if (wait) {
+      child.once('exit', (code, signal) => {
+        if (code === 0) finish();
+        else finish(new LaunchError(`啟動 Antigravity 失敗（${c.display || c.cmd} 結束狀態：${code ?? signal ?? 'unknown'}）`));
+      });
+    } else {
+      child.once('spawn', () => {
+        child.unref();
+        finish();
+      });
+    }
+    child.once('error', (e) => finish(e));
   });
 }
 
