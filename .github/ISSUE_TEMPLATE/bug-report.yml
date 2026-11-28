@@ -54,7 +54,7 @@ body:
     attributes:
       label: 版本 / Versions
       description: Antigravity 版本、antigravity-i18n 版本（`antigravity-i18n --version`）、Node.js 版本（`node -v`）
-      placeholder: "Antigravity 2.35.2 / antigravity-i18n 0.1.0 / Node 22.12.0"
+      placeholder: "Antigravity 2.35.2 / antigravity-i18n 0.2.0 / Node 22.12.0"
     validations:
       required: true
   - type: checkboxes
