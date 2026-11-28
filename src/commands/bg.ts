@@ -79,7 +79,9 @@ export function hookHint(home: string): string | null {
           ? '沒有介面內背景面板（Ctrl+Alt+B）'
           : v < 5
             ? '介面面板（Ctrl+Alt+B）沒有「掃描未翻譯英文」工具'
-            : '介面面板（Ctrl+Alt+B）沒有桌布收藏夾與輪播、外觀微調與五語即時切換';
+            : v < 6
+              ? '介面面板（Ctrl+Alt+B）沒有桌布收藏夾與輪播、外觀微調與五語即時切換'
+              : '介面面板（Ctrl+Alt+B）本身只有繁體中文，沒有五語介面';
   return `App 的主行程掛鉤為舊版（v${v}，目前為 v${info.latest}），${missing}。請重新套用一次：antigravity-i18n apply --lang <語系> --target app --force`;
 }
 

@@ -201,6 +201,16 @@ await step('apply + bg preset，並在模擬的 Electron 與 jsdom 中執行注�
   const btn = doc.getElementById('b');
   const seen = ['zh-CN', 'ja', 'ko', 'en', 'zh-TW'].map((l) => (ov.setLang(l), btn.textContent));
   assert(seen.join('|') === '设置|設定|설정|Settings|設定', `五語切換結果：${seen.join('|')}`);
+  // 面板自身五語：在面板的介面語言選單切換時，面板標題與右下角小按鈕同步切換
+  const langSel = doc.querySelector('[data-agi18n="i18n"]');
+  const panelTexts = [];
+  for (const l of ['ja', 'ko', 'zh-CN', 'en', 'zh-TW']) {
+    langSel.value = l;
+    langSel.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    panelTexts.push(`${doc.querySelector('[data-agi18n="title"]').textContent}/${doc.getElementById('antigravity-i18n-bg-launcher').textContent}/${btn.textContent}`);
+  }
+  const wantPanel = ['背景の設定/🖼 背景の設定/設定', '배경 설정/🖼 배경 설정/설정', '背景设置/🖼 背景设置/设置', 'Background/🖼 Background/Settings', '背景設定/🖼 背景設定/設定'];
+  assert(panelTexts.join('|') === wantPanel.join('|'), `面板五語切換結果：${panelTexts.join('|')}`);
   // 外觀微調：獨立的 <style>，開關立即注入／移除
   const panelHandle = dom.window.__ANTIGRAVITY_I18N_PANEL__;
   panelHandle.setPrefs({ cjkFont: true, glass: true });
