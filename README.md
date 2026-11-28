@@ -660,6 +660,19 @@ node dist/cli.js validate
 
 詞庫格式、用語規範與 PR 檢查清單請見 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
+## ☕ 支持與贊助
+
+本專案以 MIT 授權完全免費開源。如果這個工具幫你省下時間，歡迎點一顆 ⭐ Star、回報缺少的翻譯，或請作者喝杯咖啡（詳見 [SPONSOR.md](./SPONSOR.md)）：
+
+<details>
+<summary>展開支付寶收款碼</summary>
+
+<p align="center">
+  <img src="./docs/sponsor/alipay.png" alt="Alipay QR Code" width="220" />
+</p>
+
+</details>
+
 ## 授權
 
 [MIT](./LICENSE)

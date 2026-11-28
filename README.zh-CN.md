@@ -209,6 +209,19 @@ macOS 修改 App 内容会使代码签名失效，应用后请运行 `codesign -
 - [繁体中文 README](./README.md) 包含最完整的说明（检测路径、替换规则、运行时注入层原理、数据目录结构）。
 - 版本变更见 [CHANGELOG.md](./CHANGELOG.md)；AI 编程助手的协作规范见 [AGENTS.md](./AGENTS.md)。
 
+## ☕ 支持与赞助
+
+本项目以 MIT 协议完全免费开源。如果这个工具帮到你，欢迎点一颗 ⭐ Star、反馈缺少的翻译，或请作者喝杯咖啡（详见 [SPONSOR.md](./SPONSOR.md)）：
+
+<details>
+<summary>展开支付宝收款码</summary>
+
+<p align="center">
+  <img src="./docs/sponsor/alipay.png" alt="Alipay QR Code" width="220" />
+</p>
+
+</details>
+
 ## 许可证
 
 [MIT](./LICENSE)

@@ -211,6 +211,19 @@ macOS ではアプリの中身を変更するとコード署名が無効にな�
 - [繁体字中国語の README](./README.md) が最も詳しいリファレンスです（検出するパス、置換ルール、実行時注入レイヤーの仕組み、データフォルダーの構成）。
 - 変更履歴は [CHANGELOG.md](./CHANGELOG.md)、AI コーディングアシスタント向けの開発ルールは [AGENTS.md](./AGENTS.md) をご覧ください。
 
+## ☕ サポート・スポンサー
+
+本プロジェクトは MIT ライセンスの無料オープンソースです。お役に立てたら、⭐ Star や翻訳の協力、コーヒー一杯のサポートで応援していただけると励みになります（詳しくは [SPONSOR.md](./SPONSOR.md)）：
+
+<details>
+<summary>Alipay（支付宝）QR コードを表示</summary>
+
+<p align="center">
+  <img src="./docs/sponsor/alipay.png" alt="Alipay QR Code" width="220" />
+</p>
+
+</details>
+
 ## ライセンス
 
 [MIT](./LICENSE)

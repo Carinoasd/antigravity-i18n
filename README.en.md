@@ -209,6 +209,19 @@ On macOS, modifying the app invalidates its code signature; re-sign it with `cod
 - The [Traditional Chinese README](./README.md) is the most detailed reference (detection paths, replacement rules, runtime overlay internals, data directory layout).
 - Release notes: [CHANGELOG.md](./CHANGELOG.md). Rules for AI coding assistants: [AGENTS.md](./AGENTS.md).
 
+## ☕ Support & Sponsor
+
+This project is 100% free and open source under the MIT License. If it saves you time, starring the repo, contributing translations, or buying the maintainer a coffee all help keep it updated (see [SPONSOR.md](./SPONSOR.md)):
+
+<details>
+<summary>Show Alipay QR code</summary>
+
+<p align="center">
+  <img src="./docs/sponsor/alipay.png" alt="Alipay QR Code" width="220" />
+</p>
+
+</details>
+
 ## License
 
 [MIT](./LICENSE)
