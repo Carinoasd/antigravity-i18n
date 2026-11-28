@@ -10,16 +10,16 @@ A cross-platform (Linux / macOS / Windows / WSL) **localization and appearance t
 
 ## 📸 Screenshots
 
-> Screenshots are on the way. File naming and privacy-masking rules for maintainers: [docs/images/README.md](./docs/images/README.md).
-
-<!-- Screenshots: put the images in docs/images/, then delete this line and the comment-closing line below the table
-| Control panel | Antigravity in Japanese |
+| Local control panel (5 languages, status overview, one-click apply) | Desktop shortcut (smart launcher, 0 MB resident memory) |
 | :---: | :---: |
-| ![Control panel](./docs/images/control-panel.png) | ![Japanese UI](./docs/images/app-ja.png) |
-| **Ctrl + Alt + B panel: background, gallery and slideshow** | **Appearance tweaks and instant language switching** |
-| ![Background panel](./docs/images/panel-background.png) | ![Appearance and language](./docs/images/panel-appearance-lang.png) |
-| **Scan the page for untranslated text** | **Desktop shortcut (smart launcher)** |
-| ![Untranslated scan](./docs/images/panel-scan.png) | ![Desktop shortcut](./docs/images/control-panel-shortcut.png) |
+| ![Control panel](./docs/images/control-panel.png) | ![Desktop shortcut](./docs/images/control-panel-shortcut.png) |
+
+<!-- More Antigravity App and Ctrl+Alt+B panel screenshots: add them under docs/images/ and remove this comment (guide: docs/images/README.md)
+| Antigravity in Japanese | Ctrl + Alt + B panel: background, gallery and slideshow |
+| :---: | :---: |
+| ![Japanese UI](./docs/images/app-ja.png) | ![Background panel](./docs/images/panel-background.png) |
+| **Appearance tweaks and instant language switching** | **Scan the page for untranslated text** |
+| ![Appearance and language](./docs/images/panel-appearance-lang.png) | ![Untranslated scan](./docs/images/panel-scan.png) |
 -->
 
 ## 🚀 Getting started

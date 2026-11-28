@@ -10,16 +10,16 @@
 
 ## 📸 スクリーンショット
 
-> スクリーンショットは準備中です。メンテナー向けのファイル名の規則と個人情報のマスキング方法は [docs/images/README.md](./docs/images/README.md) をご覧ください。
-
-<!-- スクリーンショット：docs/images/ に画像を置いたら、この行と表の下にあるコメント終了行を削除すると表示されます
-| コントロールパネル | 日本語化した Antigravity |
+| ローカルのコントロールパネル（5 言語切替・状態一覧・ワンクリック適用） | デスクトップショートカット（スマートランチャー・常駐 0 MB） |
 | :---: | :---: |
-| ![コントロールパネル](./docs/images/control-panel.png) | ![日本語の画面](./docs/images/app-ja.png) |
-| **Ctrl + Alt + B パネル：背景・壁紙コレクション・スライドショー** | **外観の微調整と表示言語の即時切り替え** |
-| ![背景パネル](./docs/images/panel-background.png) | ![外観と表示言語](./docs/images/panel-appearance-lang.png) |
-| **未翻訳の英語をスキャン** | **デスクトップショートカット（スマートランチャー）** |
-| ![未翻訳スキャン](./docs/images/panel-scan.png) | ![デスクトップショートカット](./docs/images/control-panel-shortcut.png) |
+| ![コントロールパネル](./docs/images/control-panel.png) | ![デスクトップショートカット](./docs/images/control-panel-shortcut.png) |
+
+<!-- そのほかのアプリ画面と Ctrl+Alt+B パネルの画像：docs/images/ に追加したらこのコメントを削除すると表示されます（規則は docs/images/README.md）
+| 日本語化した Antigravity | Ctrl + Alt + B パネル：背景・壁紙コレクション・スライドショー |
+| :---: | :---: |
+| ![日本語の画面](./docs/images/app-ja.png) | ![背景パネル](./docs/images/panel-background.png) |
+| **外観の微調整と表示言語の即時切り替え** | **未翻訳の英語をスキャン** |
+| ![外観と表示言語](./docs/images/panel-appearance-lang.png) | ![未翻訳スキャン](./docs/images/panel-scan.png) |
 -->
 
 ## 🚀 はじめに

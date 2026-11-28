@@ -10,16 +10,16 @@
 
 ## 📸 스크린샷
 
-> 스크린샷은 준비 중입니다. 관리자용 파일 이름 규칙과 개인정보 가리기 방법은 [docs/images/README.md](./docs/images/README.md)를 참고하세요.
-
-<!-- 스크린샷: docs/images/에 이미지를 넣은 뒤 이 줄과 표 아래의 주석 종료 줄을 지우면 표시됩니다
-| 제어판 | 한국어로 바꾼 Antigravity |
+| 로컬 제어판 (5개 언어 전환 · 상태 요약 · 원클릭 적용) | 바탕 화면 바로 가기 (스마트 런처 · 메모리 0 MB 상주 없음) |
 | :---: | :---: |
-| ![제어판](./docs/images/control-panel.png) | ![한국어 화면](./docs/images/app-ko.png) |
-| **Ctrl + Alt + B 패널: 배경, 배경화면 컬렉션, 슬라이드쇼** | **외관 미세 조정과 표시 언어 즉시 전환** |
-| ![배경 패널](./docs/images/panel-background.png) | ![외관과 표시 언어](./docs/images/panel-appearance-lang.png) |
-| **번역되지 않은 영어 검사** | **바탕 화면 바로 가기 (스마트 런처)** |
-| ![미번역 검사](./docs/images/panel-scan.png) | ![바탕 화면 바로 가기](./docs/images/control-panel-shortcut.png) |
+| ![제어판](./docs/images/control-panel.png) | ![바탕 화면 바로 가기](./docs/images/control-panel-shortcut.png) |
+
+<!-- 추가 앱 화면 및 Ctrl+Alt+B 패널 스크린샷: docs/images/에 추가한 뒤 이 주석을 지우면 표시됩니다 (규칙: docs/images/README.md)
+| 한국어로 바꾼 Antigravity | Ctrl + Alt + B 패널: 배경, 배경화면 컬렉션, 슬라이드쇼 |
+| :---: | :---: |
+| ![한국어 화면](./docs/images/app-ko.png) | ![배경 패널](./docs/images/panel-background.png) |
+| **외관 미세 조정과 표시 언어 즉시 전환** | **번역되지 않은 영어 검사** |
+| ![외관과 표시 언어](./docs/images/panel-appearance-lang.png) | ![미번역 검사](./docs/images/panel-scan.png) |
 -->
 
 ## 🚀 시작하기

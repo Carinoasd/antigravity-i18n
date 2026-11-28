@@ -10,16 +10,16 @@
 
 ## 📸 实机展示
 
-> 实机截图整理中。维护者补图的文件名约定与隐私遮挡规范见 [docs/images/README.md](./docs/images/README.md)。
-
-<!-- 实机展示截图：把图片放进 docs/images/ 后，删除这一行和表格下方的注释结束行即可显示
-| 图形控制台 | 应用简体中文后的 Antigravity |
+| 本地图形控制台（五语切换、状态总览、一键应用） | 桌面快捷方式（智能启动器，0 MB 常驻防自动更新） |
 | :---: | :---: |
-| ![图形控制台](./docs/images/control-panel.png) | ![简体中文界面](./docs/images/app-zh-CN.png) |
-| **Ctrl + Alt + B 面板：背景、壁纸收藏夹与轮播** | **外观微调与五语即时切换** |
-| ![背景面板](./docs/images/panel-background.png) | ![外观微调与界面语言](./docs/images/panel-appearance-lang.png) |
-| **扫描本页未翻译的英文** | **桌面快捷方式（智能启动器）** |
-| ![未翻译扫描](./docs/images/panel-scan.png) | ![桌面快捷方式](./docs/images/control-panel-shortcut.png) |
+| ![图形控制台](./docs/images/control-panel.png) | ![桌面快捷方式](./docs/images/control-panel-shortcut.png) |
+
+<!-- 更多 Antigravity 本体与 Ctrl+Alt+B 面板实机截图：补上 docs/images/ 文件后移除本注释即可显示（规范见 docs/images/README.md）
+| 应用简体中文后的 Antigravity | Ctrl + Alt + B 面板：背景、壁纸收藏夹与轮播 |
+| :---: | :---: |
+| ![简体中文界面](./docs/images/app-zh-CN.png) | ![背景面板](./docs/images/panel-background.png) |
+| **外观微调与五语即时切换** | **扫描本页未翻译的英文** |
+| ![外观微调与界面语言](./docs/images/panel-appearance-lang.png) | ![未翻译扫描](./docs/images/panel-scan.png) |
 -->
 
 ## 🚀 开始使用
