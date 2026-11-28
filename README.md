@@ -1,4 +1,4 @@
-<p align="center"><b>繁體中文</b> | <a href="./README.zh-CN.md">简体中文</a> | <a href="./README.en.md">English</a></p>
+<p align="center"><b>繁體中文</b> | <a href="./README.zh-CN.md">简体中文</a> | <a href="./README.ja.md">日本語</a> | <a href="./README.ko.md">한국어</a> | <a href="./README.en.md">English</a></p>
 
 # antigravity-i18n
 
@@ -7,6 +7,20 @@
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 
 跨平台（Linux / macOS / Windows / WSL）的 **Google Antigravity 多語系在地化與外觀工具**：支援繁體中文（`zh-TW`）、簡體中文（`zh-CN`）、日文（`ja`）、韓文（`ko`）與自訂背景，**不用背指令**，打開圖形控制台按一下就好。
+
+## 📸 實機展示
+
+> 實機截圖整理中。維護者補圖的檔名約定與個資遮蓋規範請見 [docs/images/README.md](./docs/images/README.md)。
+
+<!-- 實機展示截圖：把圖片放進 docs/images/ 後，刪除這一行與表格下方的註解結束行即可顯示
+| 圖形控制台 | 套用繁體中文後的 Antigravity |
+| :---: | :---: |
+| ![圖形控制台](./docs/images/control-panel.png) | ![繁體中文介面](./docs/images/app-zh-TW.png) |
+| **Ctrl + Alt + B 面板：背景、桌布收藏夾與輪播** | **外觀微調與五語即時切換** |
+| ![背景面板](./docs/images/panel-background.png) | ![外觀微調與介面語言](./docs/images/panel-appearance-lang.png) |
+| **掃描本頁未翻譯英文** | **桌面捷徑（智慧啟動器）** |
+| ![未翻譯掃描](./docs/images/panel-scan.png) | ![桌面捷徑](./docs/images/control-panel-shortcut.png) |
+-->
 
 ## 🚀 開始使用
 
@@ -59,9 +73,12 @@ npx github:Carinoasd/antigravity-i18n
 - 只要自訂背景與 `Ctrl+Alt+B` 面板、維持英文介面
 - 一鍵無損還原官方原版
 - 套用 5 款內建漸層背景或選擇電腦中的圖片，調整不透明度／模糊／遮罩
-- 安裝或移除中文 AI 全域規則（零侵入模式）
+- 建立桌面捷徑：之後從捷徑開啟，官方自動更新洗掉在地化時會先自動重新套用
+- 安裝或移除 AI 全域語言規則（零侵入模式，四語皆可）
 
 > 控制台只監聽 `127.0.0.1`，每次啟動都會產生新的存取 Token，其他電腦或網站都無法操作。按「關閉控制台」或 `Ctrl+C` 即可結束。
+
+## ✨ 功能亮點
 
 - 🖥️ 支援 Antigravity **App**（桌面版 2.0+，`app.asar`）、**IDE**（編輯器與 Agent 面板）、**CLI**（`agy`）
 - 🧩 App 採**雙層機制**：靜態翻譯主行程選單／系統匣／更新提示，加上**執行期 DOM 注入層**即時翻譯動態載入的 React UI
@@ -70,8 +87,13 @@ npx github:Carinoasd/antigravity-i18n
 - 🪶 **零侵入模式**：只安裝全域規則，讓 AI 全程以中文回覆，完全不修改安裝檔
 - 🖼️ **自訂背景圖**（App）：`bg set` 使用自己的圖片，或 `bg preset` 套用 5 款內建純 CSS 漸層；`--tint` 加上可讀性遮罩；換圖、換預設都不需重新套用
 - 🎛️ **介面內背景面板**（App）：按 **`Ctrl + Alt + B`**（macOS `Cmd + Option + B`）直接在 Antigravity 裡選圖、換預設、拖拉桿，0 秒生效、免重開
+- 🖼️ **桌布收藏夾與自動輪播**：最多 12 張、總容量 30 MB 的低記憶體收藏夾，可每次開啟視窗或每 15／30／60 分鐘自動換圖
+- 💎 **外觀微調**：CJK 介面字型最佳化（不影響程式碼等寬字型）與毛玻璃卡片模式，一鍵開關
+- 🌐 **五語免重整即時切換**：在面板內切換繁體中文／简体中文／日本語／한국어／English 原文，不必重新整理
+- 🔍 **掃描本頁未翻譯英文**：一鍵列出尚未翻譯的介面字串，複製成 JSON 或直接到 GitHub 回報
+- 🚀 **智慧啟動器與桌面捷徑**：`launch` 在開啟時檢查一次，官方自動更新覆蓋 `app.asar` 時自動重新套用；不常駐任何背景程式（0 MB 記憶體）
 - 🎨 **僅背景模式**：`--lang none` 維持英文介面，只加上背景與面板
-- ✅ 內建 CI 詞庫驗證器（key 一致性、佔位符、保護詞、繁簡用語檢查）
+- ✅ 內建 CI 詞庫驗證器（四語 key 一致性、佔位符、保護詞、繁簡用語檢查）
 
 > ⚠️ 本專案為社群專案，與 Google 無關。修改應用程式檔案有風險，請先用 `--dry-run` 預覽，並確認 `restore` 可正常運作。
 
@@ -152,12 +174,12 @@ antigravity-i18n status --target app --path "/Applications/Antigravity.app"
 ### `apply`
 
 ```bash
-antigravity-i18n apply --lang <zh-TW|zh-CN> [--target <app|ide|cli|all>] [--path <customPath>] [--dry-run] [--force] [--no-runtime]
+antigravity-i18n apply --lang <zh-TW|zh-CN|ja|ko|none> [--target <app|ide|cli|all>] [--path <customPath>] [--dry-run] [--force] [--no-runtime]
 ```
 
 | 選項 | 說明 |
 | --- | --- |
-| `-l, --lang` | **必填**，`zh-TW`、`zh-CN`（也接受 `zh_tw`、`tw`、`zh-Hant` 等寫法），或 `none`（僅背景模式，只適用 `app`） |
+| `-l, --lang` | **必填**，`zh-TW`、`zh-CN`、`ja`、`ko`（也接受 `zh_tw`、`tw`、`zh-Hant`、`jp`、`kr` 等寫法），或 `none`（僅背景模式，只適用 `app`） |
 | `-t, --target` | `app`、`ide`、`cli` 或 `all`（預設 `all`，偵測不到的目標會自動略過） |
 | `-p, --path` | 手動指定安裝路徑，需搭配單一 `--target` |
 | `--dry-run` | 只預覽命中字串數與預計覆蓋率，不修改任何檔案 |
@@ -190,6 +212,10 @@ antigravity-i18n apply --lang zh-TW --target ide
 # 由繁體切換為簡體
 antigravity-i18n apply --lang zh-CN --force
 
+# 套用日文／韓文
+antigravity-i18n apply --lang ja
+antigravity-i18n apply --lang ko --target app
+
 # Windows 自訂安裝路徑
 antigravity-i18n apply --lang zh-TW --target app --path "D:\Apps\Antigravity"
 
@@ -213,7 +239,7 @@ antigravity-i18n restore --target app --path "/Applications/Antigravity.app"
 
 ### `rules`
 
-零侵入模式：管理 `~/.gemini/config/rules/language-zh-tw.md`（或 `language-zh-cn.md`），內含 `trigger: always_on` 的 YAML frontmatter，讓 AI 全程以中文回覆，並在說明介面時附註英文按鈕名稱（例如「設定（Settings）」），方便對照尚未中文化的介面。
+零侵入模式：管理 `~/.gemini/config/rules/language-<語系>.md`（`language-zh-tw.md`、`language-zh-cn.md`、`language-ja.md`、`language-ko.md`），內含 `trigger: always_on` 的 YAML frontmatter，讓 AI 全程以指定語言回覆，並在說明介面時附註英文按鈕名稱（例如「設定（Settings）」），方便對照尚未在地化的介面。
 
 ```bash
 antigravity-i18n rules install --lang zh-TW
@@ -233,7 +259,7 @@ description: "一律使用繁體中文（台灣）回覆，並在說明介面操
 <!-- managed-by: antigravity-i18n -->
 ```
 
-- 安裝某一語系時，會自動移除另一語系由本工具建立的規則，避免衝突。
+- 安裝某一語系時，會自動移除其他語系由本工具建立的規則，避免衝突。
 - 不會覆蓋或刪除你自己建立的同名規則檔（除非加上 `--force`）。
 
 ### `bg`（別名 `background`）
@@ -413,7 +439,7 @@ antigravity-i18n validate --dir ./locales
 
 - JSON 語法正確、根節點為物件、值皆為字串
 - 模組不可為空、key 與譯文不可為空字串
-- `zh-TW` 與 `zh-CN` 每個模組的 key 完全一致
+- `zh-TW`、`zh-CN`、`ja`、`ko` 每個模組的 key 完全一致
 - 佔位符（`{name}`、`%s`、`%d`）與原文一致
 - 保護詞白名單（`locales/protected-terms.json`）未被誤改
 - 繁簡混用與跨地區用語（例如 zh-TW 出現「命令面板」、zh-CN 出現「终端机」）
@@ -529,7 +555,7 @@ Electron / VS Code 的 bundle 裡，`"Off"`、`"Run"` 這類短字串常常同�
   ```bash
   codesign --force --deep --sign - "/Applications/Antigravity.app"
   ```
-- **官方更新**：Antigravity 更新後會覆蓋中文化內容。`status` 會顯示「部分失效」，重新執行 `apply` 即可。
+- **官方更新**：Antigravity 更新後會覆蓋在地化內容。`status` 會顯示「部分失效」，重新執行 `apply` 即可；建議改用 [`launch` 與桌面捷徑](#launch智慧啟動器與-shortcut桌面捷徑)開啟 Antigravity，會在開啟時自動重新套用。
 - **WSL**：在 WSL 中執行時，除了 Linux 路徑，也會自動偵測裝在 Windows 側的 Antigravity（`/mnt/c/Users/<使用者>/AppData/Local/Programs/…`、`/mnt/c/Program Files/…`）。若裝在其他磁碟，請用 `--path "/mnt/d/…"` 指定。修補 Windows 側檔案前同樣要先在 Windows 完全關閉 Antigravity；也可以直接在 Windows 終端機執行本工具。
 
 ## 資料目錄
@@ -537,6 +563,7 @@ Electron / VS Code 的 bundle 裡，`"Off"`、`"Run"` 這類短字串常常同�
 ```
 ~/.antigravity-i18n/          # 可用環境變數 ANTIGRAVITY_I18N_HOME 覆寫
 ├── background.json           # 自訂背景圖設定（bg 指令）
+├── launch-state.json         # launch 的雜湊快取（只影響速度，刪除後會重新計算）
 ├── manifests/
 │   └── ide-1a2b3c4d5e6f.json # 每個安裝路徑一份
 └── backups/
@@ -594,9 +621,19 @@ src/
 │   └── panel.ts           # 介面內背景設定面板（Ctrl+Alt+B、IndexedDB 持久化、未翻譯掃描）
 ├── ui/                    # 本機圖形控制台（server.ts、html.ts、actions.ts，零相依套件）
 └── commands/              # status / apply / restore / rules / bg / launch / shortcut / ui / validate
-locales/                   # 詞庫（zh-TW、zh-CN 各 7 個模組）
+locales/                   # 詞庫（zh-TW、zh-CN、ja、ko 各 7 個模組）
 tests/                     # vitest 單元測試
 ```
+
+## 🤝 貢獻詞庫
+
+看到沒被翻譯或翻錯的字串，歡迎一起補上：
+
+1. **最快的方式**：在 Antigravity 裡按 `Ctrl + Alt + B` →「掃描本頁」→「複製 JSON」，再按「前往 GitHub 回報」，把 JSON 貼進 [缺少翻譯的 Issue 範本](https://github.com/Carinoasd/antigravity-i18n/issues/new?template=missing-translation.yml)。
+2. **直接發 PR**：修改 `locales/<語系>/<模組>.json`，**四個語系同時加上相同的 key**（key 必須與介面上的英文完全相同），執行 `node dist/cli.js validate` 確認 0 錯誤後送出。
+3. 用語規範（例如 zh-TW 用「設定」、zh-CN 用「设置」）與 PR 檢查清單請見 [CONTRIBUTING.md](./CONTRIBUTING.md#翻譯用語規範)。
+
+各版本的變更請見 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 開發
 
