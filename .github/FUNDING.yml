@@ -1,14 +1,6 @@
 # 贊助按鈕設定（GitHub 頁面右上角的「Sponsor」按鈕）
 # Funding / Sponsor button configuration
 #
-# 目前所有項目都是註解，所以 GitHub 不會顯示 Sponsor 按鈕。
-# 啟用方式：
-#   1. 刪除要使用的那一行開頭的「# 」
-#   2. 把 <...> 換成維護者「實際存在」的帳號名稱（不是網址），不要保留範例文字或填入假帳號
-#   3. 合併到預設分支（main）後，GitHub 會自動在頁面上顯示 Sponsor 按鈕
-#
-# All entries are commented out, so GitHub shows no Sponsor button yet.
-# To enable one: uncomment the line, replace <...> with a real account name (not a URL), and merge to main.
 # Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
 
 # GitHub Sponsors：需要先在 https://github.com/sponsors 開通，可填多個帳號
@@ -20,5 +12,5 @@
 # Buy Me a Coffee：https://buymeacoffee.com/<username> 中的 <username>
 # buy_me_a_coffee: <buymeacoffee-username>
 
-# 其他自訂連結（最多 4 個，必須是完整網址）
-# custom: ["https://example.com/donate"]
+# 自訂贊助頁面（最多 4 個，必須是完整網址）
+custom: ["https://github.com/Carinoasd/antigravity-i18n/blob/main/SPONSOR.md"]
