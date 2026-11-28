@@ -211,6 +211,19 @@ macOS에서는 앱 내용을 수정하면 코드 서명이 무효가 됩니다. 
 - [번체 중국어 README](./README.md)가 가장 자세한 참고 문서입니다(감지 경로, 치환 규칙, 런타임 주입 계층의 동작 방식, 데이터 폴더 구조).
 - 변경 내역은 [CHANGELOG.md](./CHANGELOG.md), AI 코딩 도우미를 위한 개발 규칙은 [AGENTS.md](./AGENTS.md)를 참고하세요.
 
+## ☕ 후원하기
+
+이 프로젝트는 MIT 라이선스의 무료 오픈소스입니다. 도움이 되셨다면 ⭐ Star나 번역 기여, 또는 커피 한 잔의 후원으로 응원해 주세요(자세한 내용은 [SPONSOR.md](./SPONSOR.md)):
+
+<details>
+<summary>Alipay(알리페이) QR 코드 보기</summary>
+
+<p align="center">
+  <img src="./docs/sponsor/alipay.png" alt="Alipay QR Code" width="220" />
+</p>
+
+</details>
+
 ## 라이선스
 
 [MIT](./LICENSE)
