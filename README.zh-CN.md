@@ -13,13 +13,13 @@
 | 本地图形控制台（五语切换、状态总览、一键应用） | 桌面快捷方式（智能启动器，0 MB 常驻防自动更新） |
 | :---: | :---: |
 | ![图形控制台](./docs/images/control-panel.png) | ![桌面快捷方式](./docs/images/control-panel-shortcut.png) |
+| **`Ctrl + Alt + B` 面板：背景来源、渐变与收藏轮播** | **`Ctrl + Alt + B` 面板：外观微调、五语切换与未翻译扫描** |
+| <img src="./docs/images/panel-background.png" alt="背景面板" width="280" /> | <img src="./docs/images/panel-appearance-lang.png" alt="外观微调与界面语言" width="260" /> |
 
-<!-- 更多 Antigravity 本体与 Ctrl+Alt+B 面板实机截图：补上 docs/images/ 文件后移除本注释即可显示（规范见 docs/images/README.md）
-| 应用简体中文后的 Antigravity | Ctrl + Alt + B 面板：背景、壁纸收藏夹与轮播 |
+<!-- 更多 Antigravity 全窗口界面截图：补上 docs/images/app-*.png 后移除本注释即可显示（规范见 docs/images/README.md）
+| 应用简体中文后的 Antigravity | 扫描本页未翻译的英文结果 |
 | :---: | :---: |
-| ![简体中文界面](./docs/images/app-zh-CN.png) | ![背景面板](./docs/images/panel-background.png) |
-| **外观微调与五语即时切换** | **扫描本页未翻译的英文** |
-| ![外观微调与界面语言](./docs/images/panel-appearance-lang.png) | ![未翻译扫描](./docs/images/panel-scan.png) |
+| ![简体中文界面](./docs/images/app-zh-CN.png) | ![未翻译扫描](./docs/images/panel-scan.png) |
 -->
 
 ## 🚀 开始使用

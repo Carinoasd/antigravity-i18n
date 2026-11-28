@@ -13,13 +13,13 @@
 | 本機圖形控制台（五語切換、狀態總覽、一鍵套用） | 桌面捷徑（智慧啟動器，0 MB 常駐防自動更新） |
 | :---: | :---: |
 | ![圖形控制台](./docs/images/control-panel.png) | ![桌面捷徑](./docs/images/control-panel-shortcut.png) |
+| **`Ctrl + Alt + B` 面板：背景來源、漸層與收藏輪播** | **`Ctrl + Alt + B` 面板：外觀微調、五語切換與未翻譯掃描** |
+| <img src="./docs/images/panel-background.png" alt="背景面板" width="280" /> | <img src="./docs/images/panel-appearance-lang.png" alt="外觀微調與介面語言" width="260" /> |
 
-<!-- 更多 Antigravity 本體與 Ctrl+Alt+B 面板實機截圖：補上 docs/images/ 檔案後移除本註解即可顯示（規範見 docs/images/README.md）
-| 套用繁體中文後的 Antigravity | Ctrl + Alt + B 面板：背景、桌布收藏夾與輪播 |
+<!-- 更多 Antigravity 全視窗介面截圖：補上 docs/images/app-*.png 後移除本註解即可顯示（規範見 docs/images/README.md）
+| 套用繁體中文後的 Antigravity | 掃描本頁未翻譯英文結果 |
 | :---: | :---: |
-| ![繁體中文介面](./docs/images/app-zh-TW.png) | ![背景面板](./docs/images/panel-background.png) |
-| **外觀微調與五語即時切換** | **掃描本頁未翻譯英文** |
-| ![外觀微調與介面語言](./docs/images/panel-appearance-lang.png) | ![未翻譯掃描](./docs/images/panel-scan.png) |
+| ![繁體中文介面](./docs/images/app-zh-TW.png) | ![未翻譯掃描](./docs/images/panel-scan.png) |
 -->
 
 ## 🚀 開始使用
