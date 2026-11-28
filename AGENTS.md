@@ -161,6 +161,6 @@ src/runtime/background.ts  背景圖：主行程讀取 + renderer 注入
 src/runtime/panel.ts       介面內背景設定面板（Ctrl+Alt+B）
 src/commands/              status / apply / restore / rules / bg / launch / shortcut / ui / validate
 src/ui/                    本機圖形控制台：server / actions / html（零相依套件）
-locales/                   zh-TW、zh-CN 各 7 個模組 + protected-terms.json
+locales/                   zh-TW、zh-CN、ja、ko 各 7 個模組 + protected-terms.json
 tests/                     vitest 單元測試（runtime 測試使用 jsdom，面板持久化測試使用 fake-indexeddb）
 ```
