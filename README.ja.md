@@ -13,13 +13,13 @@
 | ローカルのコントロールパネル（5 言語切替・状態一覧・ワンクリック適用） | デスクトップショートカット（スマートランチャー・常駐 0 MB） |
 | :---: | :---: |
 | ![コントロールパネル](./docs/images/control-panel.png) | ![デスクトップショートカット](./docs/images/control-panel-shortcut.png) |
+| **`Ctrl + Alt + B` パネル：背景・グラデーション・壁紙コレクション** | **`Ctrl + Alt + B` パネル：外観微調整・5 言語切替・未翻訳スキャン** |
+| <img src="./docs/images/panel-background.png" alt="背景パネル" width="280" /> | <img src="./docs/images/panel-appearance-lang.png" alt="外観と表示言語" width="260" /> |
 
-<!-- そのほかのアプリ画面と Ctrl+Alt+B パネルの画像：docs/images/ に追加したらこのコメントを削除すると表示されます（規則は docs/images/README.md）
-| 日本語化した Antigravity | Ctrl + Alt + B パネル：背景・壁紙コレクション・スライドショー |
+<!-- そのほかのアプリ画面の画像：docs/images/ に追加したらこのコメントを削除すると表示されます（規則は docs/images/README.md）
+| 日本語化した Antigravity | 未翻訳スキャン結果 |
 | :---: | :---: |
-| ![日本語の画面](./docs/images/app-ja.png) | ![背景パネル](./docs/images/panel-background.png) |
-| **外観の微調整と表示言語の即時切り替え** | **未翻訳の英語をスキャン** |
-| ![外観と表示言語](./docs/images/panel-appearance-lang.png) | ![未翻訳スキャン](./docs/images/panel-scan.png) |
+| ![日本語の画面](./docs/images/app-ja.png) | ![未翻訳スキャン](./docs/images/panel-scan.png) |
 -->
 
 ## 🚀 はじめに
