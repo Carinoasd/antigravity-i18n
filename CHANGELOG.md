@@ -17,7 +17,7 @@
 
 第一個正式發佈版本：推送 `v0.2.0` tag 後，GitHub Actions 會在三平台打包單檔執行檔，並建立附有 `SHA256SUMS.txt` 的 Release。
 
-> **升級提醒**：App 的主行程掛鉤從 v4 升級為 **v6**。升級本工具後請執行一次
+> **升級提醒**：App 的主行程掛鉤從 v4 升級為 **v7**。升級本工具後請執行一次
 > `antigravity-i18n apply --target app --lang <語系> --force`；或直接透過 `antigravity-i18n launch`（桌面捷徑）
 > 開啟 Antigravity，偵測到舊版掛鉤時會自動重新套用。
 
@@ -38,6 +38,10 @@
 - **外觀微調**（#9）：CJK 介面字型最佳化（不影響程式碼等寬字型）與毛玻璃卡片模式，預設關閉、開關立即生效。
 - **五語免重整即時切換**（#9）：面板內切換繁體中文／简体中文／日本語／한국어／English 原文，不必重新整理頁面。
   四語詞庫以共享 key 的精簡格式一起打包進 runtime（約為四份獨立詞庫的一半大小）。
+- **面板自身五語系化**：`Ctrl + Alt + B` 面板與右下角「背景設定」小按鈕的所有文字（標題、按鈕、選單選項、內建漸層名稱、
+  狀態與錯誤訊息、容量配額、`aria-label`、快捷鍵說明）都支援繁體中文／简体中文／日本語／한국어／English。
+  有翻譯 runtime 時跟隨目前顯示的語系，在「介面語言」切換時面板同步切換；僅背景模式依 `navigator.language` 自動選擇。
+  文案表的唯一來源為 `src/core/panel-i18n.ts`，由掛鉤內嵌傳入面板。
 - **詞庫**：補齊 Antigravity v2.36.0 首頁的 7 條高頻字串（`Workspace`、`No Project`、首頁輸入框與建議卡片等），四語各 632 條（#8）。
 - **文件**：新增日文 [`README.ja.md`](./README.ja.md) 與韓文 [`README.ko.md`](./README.ko.md)，五份 README 頂部加上五語導覽列，
   並預留「實機展示」截圖區塊（檔名約定見 [`docs/images/README.md`](./docs/images/README.md)）。
@@ -45,7 +49,7 @@
 
 ### 變更
 
-- 主行程掛鉤 `HOOK_VERSION` 4 → 6：v5 加上未翻譯掃描，v6 加上桌布收藏夾、外觀微調與五語切換。
+- 主行程掛鉤 `HOOK_VERSION` 4 → 7：v5 加上未翻譯掃描，v6 加上桌布收藏夾、外觀微調與五語切換，v7 讓面板本身支援五語。
 - 面板原本的「中文介面」勾選框改為五語選單；偏好改存於 `localStorage` 的 `antigravity-i18n:lang`，
   舊的 `antigravity-i18n:i18n-disabled` 旗標仍然有效。以其他語系重新 `apply` 後，舊的介面語言選擇不再生效。
 - 面板的 IndexedDB `antigravity-i18n` 升級為版本 2（新增 `gallery` store，既有的 `settings` 完整保留）。
