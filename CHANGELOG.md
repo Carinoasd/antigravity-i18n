@@ -13,6 +13,13 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-28
+
+### 修正
+
+- **WSL / macOS 智慧啟動器桌面捷徑**（[#16](https://github.com/Carinoasd/antigravity-i18n/pull/16)）：修正從 Windows 桌面點擊 WSL 建立的 `Antigravity (i18n).lnk` 捷徑時，`wsl.exe` 提前拆掉 `WSL_INTEROP` socket 導致 Antigravity 沒有啟動的問題；短命包裝程式（WSL `cmd.exe /d /c start` 與 macOS `open -a`）改為等待退出後再結束並檢查狀態碼。
+- **`Ctrl + Alt + B` 面板按鈕排版**：面板寬度微調為 `320px` 並加上 `white-space: nowrap` 與 `flex-wrap: wrap`，避免「加入目前圖片」「下一張」等五語按鈕被擠成兩行。
+
 ## [0.2.0] - 2026-11-28
 
 第一個正式發佈版本：推送 `v0.2.0` tag 後，GitHub Actions 會在三平台打包單檔執行檔，並建立附有 `SHA256SUMS.txt` 的 Release。
