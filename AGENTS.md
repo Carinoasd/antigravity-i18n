@@ -48,6 +48,11 @@ npm run smoke:sea -- dist-sea/antigravity-i18n-<平台>-<架構>
   - `src/core/translator.ts`：靜態替換引擎，只替換完整字串常值；短字串只在 UI 語境替換。
   - `src/core/runtime.ts`：產生 runtime 腳本與主行程掛鉤（含背景圖載入）。掛鉤行為改變時遞增 `HOOK_VERSION`。
   - `src/core/background.ts`：背景圖設定檔的驗證、讀寫、WSL 路徑轉換與鏡像。
+  - `src/core/panel-i18n.ts`：`Ctrl + Alt + B` 面板自身五語文案（`zh-TW` / `zh-CN` / `ja` / `ko` / `en`）的**唯一來源**，
+    由掛鉤以 `panelCfg.i18n` 內嵌傳入。五語 key 必須一致、佔位符相同，`zh-TW` / `zh-CN` 必須通過 `TERMINOLOGY_RULES`，
+    與控制台 `UI_TEXT` 重疊的用語（內建漸層、不透明度、模糊、遮罩）必須相同（測試會比對）。面板內另有一份 `zh-TW` 內建預設
+    （沒有傳入 i18n 時使用），必須與這裡完全相同。面板語系：有翻譯 runtime 時跟隨 `ov.lang`（停用時為 `en`），
+    僅背景模式依 `navigator.language`（規則與 `panelLangFromNavigator` 相同）。
   - `src/core/presets.ts`：內建純 CSS 漸層預設的**唯一來源**；`apply` 時以 JSON 內嵌進掛鉤。
     預設只能用漸層與顏色值（字元限制 `[A-Za-z0-9#%.,()\s-]`，不可有 `url()`）。新增或修改預設後，使用者需重新 `apply --force` 才會更新掛鉤內的表。
   - `src/runtime/overlay.ts`：注入 renderer 的 DOM 翻譯 runtime。
@@ -155,7 +160,7 @@ scripts/smoke-sea.mjs      單檔執行檔冒煙測試（Release 與 PR CI 共�
 .github/workflows/         ci.yml（PR）、sea.yml（三平台打包，可重用）、release.yml（v* tag 發布）
 src/types.ts               共用型別、語系／目標／模組常數
 src/config/paths.ts        各平台（含 WSL）安裝路徑偵測
-src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / rules / errors / launcher / shortcut
+src/core/                  asar / locales / translator / backup / patcher / runtime / background / presets / panel-i18n / rules / errors / launcher / shortcut
 src/runtime/overlay.ts     renderer 端 DOM 翻譯 runtime
 src/runtime/background.ts  背景圖：主行程讀取 + renderer 注入
 src/runtime/panel.ts       介面內背景設定面板（Ctrl+Alt+B）

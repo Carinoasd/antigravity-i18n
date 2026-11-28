@@ -2,6 +2,7 @@ import path from 'node:path';
 import { applyBackground, readBackgroundPayload } from '../runtime/background.js';
 import { antigravityI18nOverlay, type OverlayOptions, type RuntimePack } from '../runtime/overlay.js';
 import { antigravityI18nPanel } from '../runtime/panel.js';
+import { panelI18n } from './panel-i18n.js';
 import { presetImages, presetMeta } from './presets.js';
 import { LANGS, type Dictionary, type Lang } from '../types.js';
 
@@ -32,8 +33,9 @@ export const RUNTIME_MARKER = '/* antigravity-i18n:runtime */';
  * - 4：介面內背景設定面板（Ctrl+Alt+B），設定存於 IndexedDB
  * - 5：面板新增「掃描未翻譯英文」（複製 JSON、前往 GitHub 回報）
  * - 6：桌布收藏夾與自動輪播、外觀微調（CJK 字型、毛玻璃）、四語 runtime 與面板內五語即時切換
+ * - 7：面板自身五語系化（文案表以 panelCfg.i18n 傳入，跟隨顯示語系或瀏覽器語系）
  */
-export const HOOK_VERSION = 6;
+export const HOOK_VERSION = 7;
 
 /** 介面面板選圖的大小上限（與 CLI 相同） */
 export const PANEL_MAX_BYTES = 10 * 1024 * 1024;
@@ -178,6 +180,7 @@ function installSource(): string {
     var __agi18nPresets = ${JSON.stringify(presetImages())};
     var __agi18nPanel = ${JSON.stringify(antigravityI18nPanel.toString())};
     var __agi18nPanelPresets = ${JSON.stringify(presetMeta())};
+    var __agi18nPanelI18n = ${JSON.stringify(panelI18n())};
     function __agi18nInstall(app, code, readBg) {
     if (!app || (!code && !readBg) || globalThis.__ANTIGRAVITY_I18N_HOOK__) return;
     globalThis.__ANTIGRAVITY_I18N_HOOK__ = ${HOOK_VERSION};
@@ -206,7 +209,7 @@ function installSource(): string {
             if (bg) inject(wc, '(' + __agi18nApplyBg + ')(' + JSON.stringify(bg) + ');', 'background');
           } else {
             // 介面面板（Ctrl+Alt+B）：即使沒有 CLI 設定也注入，讓使用者隨時能在介面中設定
-            var panelCfg = { cli: bg, presets: __agi18nPanelPresets, maxBytes: ${PANEL_MAX_BYTES}, version: ${HOOK_VERSION} };
+            var panelCfg = { cli: bg, presets: __agi18nPanelPresets, maxBytes: ${PANEL_MAX_BYTES}, version: ${HOOK_VERSION}, i18n: __agi18nPanelI18n };
             inject(wc, '(function(){var applyBackground=' + __agi18nApplyBg + ';(' + __agi18nPanel + ')(applyBackground,' + JSON.stringify(panelCfg) + ');})();', 'background panel');
           }
         }

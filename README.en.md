@@ -94,19 +94,19 @@ npx github:Carinoasd/antigravity-i18n
 
 ## 🎛️ The `Ctrl + Alt + B` panel
 
-Inside Antigravity, press **`Ctrl + Alt + B`** (macOS **`Cmd + Option + B`**). On **Settings → Appearance** a small「🖼 背景設定」button also appears. Every change applies instantly.
+Inside Antigravity, press **`Ctrl + Alt + B`** (macOS **`Cmd + Option + B`**). On **Settings → Appearance** a small "🖼 Background" button also appears. Every change applies instantly.
 
-> The panel's own labels are currently in Traditional Chinese only, so the button names below are given as *English*（中文）.
+> The panel itself speaks five languages too: it follows the language Antigravity is currently showing (and switches along with the language menu below), and in background-only mode it picks one from your system / browser language.
 
 - **Background**: pick a PNG / JPEG / WebP / GIF from your computer (up to 10 MB) or one of 5 built-in gradients, then tune opacity, blur, alignment, scaling, tint and layer mode.
-- **Wallpaper gallery and slideshow**: *Add current image*（加入目前圖片）saves the background to a gallery; click a thumbnail to switch, ✕ to delete. To keep memory low, the gallery is capped at **10 MB per image, 12 images and 30 MB in total**, and only the current image stays in memory. The slideshow can be off, switch on every window launch, or run every 15 / 30 / 60 minutes; there is also a *Next*（下一張）button.
+- **Wallpaper gallery and slideshow**: "Add current image"saves the background to a gallery; click a thumbnail to switch, ✕ to delete. To keep memory low, the gallery is capped at **10 MB per image, 12 images and 30 MB in total**, and only the current image stays in memory. The slideshow can be off, switch on every window launch, or run every 15 / 30 / 60 minutes; there is also a "Next"button.
 - **Appearance tweaks** (both off by default):
   - **CJK UI font**: uses the `PingFang TC` / `Microsoft JhengHei UI` / `Noto Sans CJK TC` / `Hiragino Sans` / `Malgun Gothic` stack for the regular UI; code, editors, terminals and monospace classes keep their fonts.
   - **Glassmorphism cards**: dialogs, menus and cards get a translucent background with `backdrop-filter: blur(10px)`.
 - **Instant language switching**: 繁體中文 / 简体中文 / 日本語 / 한국어 / English (original). `apply` bundles all four dictionaries in a compact shared-key format, so switching re-translates the page without a reload. Native menus and the tray keep the language chosen at `apply`.
-- **Scan for untranslated text**: lists the English UI strings on the current page that the dictionary does not cover yet (code, editors, terminals, AI replies and form contents are skipped). *Copy JSON*（複製 JSON）produces `{ "Original Text": "" }`, and *Report on GitHub*（前往 GitHub 回報）opens the missing-translation issue form.
+- **Scan for untranslated text**: lists the English UI strings on the current page that the dictionary does not cover yet (code, editors, terminals, AI replies and form contents are skipped). "Copy JSON"produces `{ "Original Text": "" }`, and "Report on GitHub"opens the missing-translation issue form.
 
-Panel settings live in the app's IndexedDB and take priority over the CLI `background.json`; *Reset*（重設）goes back to the CLI settings. The CLI equivalents:
+Panel settings live in the app's IndexedDB and take priority over the CLI `background.json`; "Reset"goes back to the CLI settings. The CLI equivalents:
 
 ```bash
 antigravity-i18n bg presets                                    # aurora, nebula, sunset, midnight, forest
@@ -200,7 +200,7 @@ On macOS, modifying the app invalidates its code signature; re-sign it with `cod
 
 ## 🤝 Contributing translations
 
-1. **Quickest**: in Antigravity press `Ctrl + Alt + B` → *Scan this page*（掃描本頁）→ *Copy JSON*（複製 JSON）, then *Report on GitHub*（前往 GitHub 回報）and paste the JSON into the [missing-translation issue form](https://github.com/Carinoasd/antigravity-i18n/issues/new?template=missing-translation.yml).
+1. **Quickest**: in Antigravity press `Ctrl + Alt + B` → "Scan this page"→ "Copy JSON", then "Report on GitHub"and paste the JSON into the [missing-translation issue form](https://github.com/Carinoasd/antigravity-i18n/issues/new?template=missing-translation.yml).
 2. **Pull request**: edit `locales/<lang>/<module>.json` and **add the same key to all four languages** (the key must match the English UI text exactly). Run `node dist/cli.js validate` and make sure it reports 0 errors.
 3. Terminology rules and the PR checklist: [CONTRIBUTING.md](./CONTRIBUTING.md).
 

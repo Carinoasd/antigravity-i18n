@@ -20,6 +20,8 @@
  *   縮圖只在面板開啟時讀取、關閉即釋放
  * - 外觀微調：CJK 介面字型最佳化、毛玻璃卡片模式（各自獨立的 <style>，開關立即生效／移除）
  * - 五語即時切換（繁中／簡中／日文／韓文／English 原文），由翻譯 runtime 的 setLang() 免重整完成
+ * - 面板自身的文字也支援五語：有翻譯 runtime 時跟隨目前顯示語系，僅背景模式依 navigator.language 決定；
+ *   文案表由掛鉤以 `cfg.i18n` 傳入（唯一來源：src/core/panel-i18n.ts），沒有傳入時退回內建的繁體中文
  *
  * ⚠️ 此函式會被 `toString()` 序列化：必須完全自足（不可引用模組層級變數、import 或其他
  *    函式），任何錯誤只能 `console.warn`。`applyBackground` 由掛鉤以參數傳入。
@@ -38,6 +40,8 @@ export interface PanelConfig {
   presets: Record<string, PanelPreset>;
   maxBytes: number;
   version: number;
+  /** 面板自身的五語文案（`src/core/panel-i18n.ts`）；沒有時使用內建的繁體中文 */
+  i18n?: Record<string, Record<string, string>>;
 }
 
 export type PanelSource = 'cli' | 'image' | 'preset' | 'gallery';
@@ -138,6 +142,10 @@ export interface PanelHandle {
   next(): Promise<boolean>;
   /** 切換介面語系（zh-TW / zh-CN / ja / ko / en） */
   setLang(lang: string): void;
+  /** 面板自身目前使用的語系 */
+  readonly uiLang: string;
+  /** 以面板目前的語系取得文案（測試與除錯用） */
+  text(key: string, vars?: Record<string, string | number>): string;
 }
 
 export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => void, cfg: PanelConfig): void {
@@ -194,23 +202,21 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     const HASH_RE = /^[0-9a-f]{8}$/;
     const SLIDES: Record<string, number> = { off: 0, 'on-launch': 0, '15m': 15 * 60_000, '30m': 30 * 60_000, '60m': 60 * 60_000 };
     const FONT_STACK = '"PingFang TC", "Microsoft JhengHei UI", "Noto Sans CJK TC", "Hiragino Sans", "Malgun Gothic", sans-serif';
-    const LANG_LABELS: [string, string][] = [
-      ['zh-TW', '繁體中文'],
-      ['zh-CN', '简体中文'],
-      ['ja', '日本語'],
-      ['ko', '한국어'],
-      ['en', 'English（原文）'],
-    ];
+    /** 語言選單：各語系以自己的名稱顯示；English 的「原文」說明隨面板語系翻譯 */
+    const LANG_ORDER = ['zh-TW', 'zh-CN', 'ja', 'ko', 'en'];
+    const NATIVE: Record<string, string> = { 'zh-TW': '繁體中文', 'zh-CN': '简体中文', ja: '日本語', ko: '한국어' };
+    const BCP47: Record<string, string> = { 'zh-TW': 'zh-Hant-TW', 'zh-CN': 'zh-Hans-CN', ja: 'ja', ko: 'ko', en: 'en' };
     const I18N_KEY = 'antigravity-i18n:i18n-disabled';
     const SKIP = 'data-antigravity-i18n-skip';
     const MIMES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
     const DATA_RE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
     const POSITIONS = ['center', 'top', 'bottom', 'left', 'right'];
+    /** [值, 文案 key] */
     const TINTS: [string, string][] = [
-      ['', '無'],
-      ['rgba(0,0,0,0.25)', '暗色 25%'],
-      ['rgba(0,0,0,0.45)', '深暗 45%'],
-      ['rgba(10,25,60,0.35)', '深藍 35%'],
+      ['', 'tint.none'],
+      ['rgba(0,0,0,0.25)', 'tint.dark25'],
+      ['rgba(0,0,0,0.45)', 'tint.dark45'],
+      ['rgba(10,25,60,0.35)', 'tint.navy35'],
     ];
     const APPEARANCE = ['Appearance', '外觀', '外观', '外観', '모양', '외관'];
     const presets = cfg.presets && typeof cfg.presets === 'object' ? cfg.presets : {};
@@ -406,7 +412,7 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
         if (!db || !ui) return;
         idbRequest('readwrite', (s) => s.put({ ...ui, updatedAt: new Date().toISOString() }, KEY)).catch((e) => {
           persistent = false;
-          say('無法寫入 IndexedDB，變更只在目前視窗生效', true);
+          say('msg.saveFailed', undefined, true);
           warn('save failed', e);
         });
       }, 150);
@@ -419,6 +425,164 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       if (text !== undefined) n.textContent = text;
       return n;
     };
+
+    // ── 面板自身的五語文案 ────────────────────────────────
+    /** 內建預設（繁體中文）：必須與 src/core/panel-i18n.ts 的 zh-TW 完全相同（測試逐條比對） */
+    const BUILTIN: Record<string, string> = {
+      title: '背景設定',
+      close: '關閉',
+      launcher: '🖼 背景設定',
+      launcherTitle: '背景設定（Ctrl+Alt+B）',
+      enabled: '啟用背景',
+      'sec.source': '背景來源',
+      pick: '選擇本機圖片…',
+      'sec.presets': '內建漸層',
+      'sec.look': '外觀',
+      'label.opacity': '不透明度',
+      'label.blur': '模糊',
+      'label.position': '對齊',
+      'pos.center': '置中',
+      'pos.top': '靠上',
+      'pos.bottom': '靠下',
+      'pos.left': '靠左',
+      'pos.right': '靠右',
+      'label.size': '縮放',
+      'size.cover': '填滿（cover）',
+      'size.contain': '完整顯示（contain）',
+      'label.tint': '遮罩',
+      'tint.none': '無',
+      'tint.dark25': '暗色 25%',
+      'tint.dark45': '深暗 45%',
+      'tint.navy35': '深藍 35%',
+      'label.mode': '圖層',
+      'mode.overlay': '覆蓋在介面上（overlay）',
+      'mode.underlay': '放在介面底層（underlay）',
+      reset: '重設（改回 CLI 設定）',
+      'sec.gallery': '桌布收藏夾',
+      'gallery.add': '加入目前圖片',
+      'gallery.next': '下一張',
+      'gallery.delete': '從收藏夾刪除',
+      'gallery.quota': '{count}/{max} 張．{used}/{total} MB',
+      'gallery.unavailable': '無法使用 IndexedDB，收藏夾停用',
+      'label.slideshow': '自動輪播',
+      'slide.off': '關閉',
+      'slide.on-launch': '每次開啟視窗換下一張',
+      'slide.15m': '每 15 分鐘',
+      'slide.30m': '每 30 分鐘',
+      'slide.60m': '每 60 分鐘',
+      'sec.tweaks': '外觀微調',
+      cjkFont: 'CJK 介面字型最佳化',
+      glass: '毛玻璃卡片模式',
+      'sec.lang': '語言',
+      'lang.label': '介面語言',
+      'lang.en': 'English（原文）',
+      'sec.scan': '掃描未翻譯英文',
+      'scan.run': '掃描本頁',
+      'scan.copy': '複製 JSON',
+      'scan.report': '前往 GitHub 回報',
+      'scan.count': '找到 {n} 筆',
+      'scan.more': '…以及另外 {n} 筆',
+      foot: 'Ctrl+Alt+B（macOS：⌘+⌥+B）開關．Esc 關閉',
+      'preset.aurora': '極光',
+      'preset.nebula': '星雲',
+      'preset.sunset': '霓虹夕陽',
+      'preset.midnight': '深夜藍',
+      'preset.forest': '靜謐森林',
+      'msg.saveFailed': '無法寫入 IndexedDB，變更只在目前視窗生效',
+      'msg.noIdb': '此環境無法使用 IndexedDB：介面中的變更只在目前視窗生效，重新開啟後會改回 CLI 設定',
+      'msg.applied': '已套用「{name}」',
+      'msg.appliedTemp': '已套用「{name}」（只在目前視窗生效）',
+      'msg.imageSaved': '已套用「{name}」並儲存',
+      'msg.tooLarge': '圖片大小 {size} MB 超過上限 {max} MB，請選擇較小的圖片',
+      'msg.badType': '只支援 PNG、JPEG、WebP、GIF 圖片',
+      'msg.noReader': '此環境無法讀取本機檔案',
+      'msg.unreadable': '無法讀取這張圖片',
+      'msg.readFailed': '讀取圖片失敗',
+      'msg.resetCli': '已改回 CLI 設定（background.json）',
+      'msg.resetNone': '已清除介面設定；目前沒有 CLI 背景設定，背景已關閉',
+      'msg.langEn': '已切換為英文原文',
+      'msg.lang': '已切換為{label}',
+      'msg.galleryEmpty': '收藏夾沒有圖片：先加入幾張再輪播',
+      'msg.slideOff': '已關閉自動輪播',
+      'msg.slideOn': '已設定自動輪播：{mode}',
+      'msg.scanNoRuntime': '目前沒有載入翻譯（僅背景模式），列出的是本頁所有英文字串',
+      'msg.scanFound': '找到 {n} 筆未翻譯的英文，可複製 JSON 後到 GitHub 回報',
+      'msg.scanNone': '這一頁沒有找到未翻譯的英文',
+      'msg.copied': '已複製 {n} 筆到剪貼簿',
+      'msg.copyFailed': '無法存取剪貼簿，請改用開發者工具複製',
+      'msg.galleryFailed': '收藏夾操作失敗',
+      'msg.galleryNoIdb': '此環境無法使用 IndexedDB，收藏夾無法使用',
+      'msg.notImage': '目前的背景不是圖片：請先「選擇本機圖片…」再加入收藏',
+      'msg.itemTooLarge': '圖片 {size} MB 超過單張上限 {max} MB',
+      'msg.duplicate': '這張圖片已在收藏夾中',
+      'msg.galleryFull': '收藏夾最多 {max} 張，請先刪除不需要的圖片',
+      'msg.galleryQuota': '收藏夾總容量上限 {max} MB（已用 {used} MB，這張 {size} MB），請先刪除不需要的圖片',
+      'msg.galleryAdded': '已加入收藏夾（{count}/{max}）',
+      'msg.galleryBroken': '這張收藏已損毀或不存在，已略過',
+      'msg.deletedCurrentCli': '已刪除目前的桌布，改回 CLI 設定',
+      'msg.deletedCurrent': '已刪除目前的桌布',
+      'msg.deleted': '已從收藏夾刪除',
+    };
+    /** cfg.i18n 來自掛鉤：只接受字串，其他型別一律忽略 */
+    const tables: Record<string, Record<string, string>> = {};
+    try {
+      const raw = cfg.i18n;
+      if (raw && typeof raw === 'object') {
+        for (const l of LANG_ORDER) {
+          const tbl = (raw as Record<string, unknown>)[l];
+          if (!tbl || typeof tbl !== 'object') continue;
+          const clean: Record<string, string> = {};
+          for (const [k, v] of Object.entries(tbl as Record<string, unknown>)) if (typeof v === 'string' && v.length <= 500) clean[k] = v;
+          tables[l] = clean;
+        }
+      }
+    } catch (e) {
+      warn('invalid i18n table', e);
+    }
+    const hasTables = Object.keys(tables).length > 0;
+    /** 僅背景模式：依瀏覽器語系挑選（規則與 src/core/panel-i18n.ts 的 panelLangFromNavigator 相同） */
+    const navLang = (): string => {
+      let v = '';
+      try {
+        v = String(g.navigator?.language ?? '').toLowerCase();
+      } catch {
+        v = '';
+      }
+      if (/^zh-(?:tw|hk|mo)(?:-|$)|^zh-hant(?:-|$)/.test(v)) return 'zh-TW';
+      if (/^zh(?:-|$)/.test(v)) return 'zh-CN';
+      if (/^ja(?:-|$)/.test(v)) return 'ja';
+      if (/^ko(?:-|$)/.test(v)) return 'ko';
+      return 'en';
+    };
+    /** 有翻譯 runtime 時跟隨目前顯示語系；否則依瀏覽器語系；沒有文案表時固定為內建的繁體中文 */
+    const pickLang = (): string => {
+      if (!hasTables) return 'zh-TW';
+      const ov = g.__ANTIGRAVITY_I18N__;
+      const want = ov ? (ov.enabled === false ? 'en' : String(ov.lang ?? 'zh-TW')) : navLang();
+      return tables[want] ? want : tables.en ? 'en' : (Object.keys(tables)[0] ?? 'zh-TW');
+    };
+    let uiLang = pickLang();
+    type Vars = Record<string, string | number | { t: string }>;
+    const t = (key: string, vars?: Vars, fallback?: string): string => {
+      const s = tables[uiLang]?.[key] ?? tables.en?.[key] ?? BUILTIN[key] ?? fallback ?? key;
+      if (!vars) return s;
+      return s.replace(/\{([A-Za-z]+)\}/g, (m, name: string) => {
+        if (!Object.prototype.hasOwnProperty.call(vars, name)) return m;
+        const v = vars[name]!;
+        return typeof v === 'object' ? t(v.t) : String(v);
+      });
+    };
+    /** 綁定：語系切換時重新寫入 textContent 或屬性（一律不用 innerHTML） */
+    const bound: { n: Element; key: string; attr?: string; fallback?: string }[] = [];
+    const tx = <E extends Element>(n: E, key: string, attr?: string, fallback?: string): E => {
+      bound.push({ n, key, attr, fallback });
+      const v = t(key, undefined, fallback);
+      if (attr) n.setAttribute(attr, v);
+      else n.textContent = v;
+      return n;
+    };
+    const elT = <K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string>, key: string): HTMLElementTagNameMap[K] => tx(el(tag, attrs), key);
+    const langLabel = (l: string): string => (l === 'en' ? t('lang.en') : (NATIVE[l] ?? l));
 
     const style = el('style', { id: 'antigravity-i18n-panel-style' });
     style.textContent = [
@@ -458,22 +622,23 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       '#antigravity-i18n-bg-launcher:hover{opacity:1;}',
     ].join('');
 
-    const panel = el('div', { id: 'antigravity-i18n-panel', role: 'dialog', 'aria-label': '背景設定', [SKIP]: '', hidden: '' });
+    const panel = tx(el('div', { id: 'antigravity-i18n-panel', role: 'dialog', [SKIP]: '', hidden: '' }), 'title', 'aria-label');
     const head = el('div', { class: 'agi18n-head' });
-    head.append(el('span', {}, '背景設定'), el('button', { type: 'button', 'data-agi18n': 'close', 'aria-label': '關閉' }, '✕'));
+    head.append(elT('span', { 'data-agi18n': 'title' }, 'title'), tx(el('button', { type: 'button', 'data-agi18n': 'close' }, '✕'), 'close', 'aria-label'));
 
     const enabledBox = el('input', { type: 'checkbox', 'data-agi18n': 'enabled' });
     const enabledRow = el('label', { class: 'agi18n-row' });
-    enabledRow.append(el('span', {}, '啟用背景'), enabledBox);
+    enabledRow.append(elT('span', {}, 'enabled'), enabledBox);
 
     const fileInput = el('input', { type: 'file', accept: MIMES.join(','), 'data-agi18n': 'file', style: 'display:none' });
-    const fileBtn = el('label', { class: 'agi18n-btn', 'data-agi18n': 'pick' }, '選擇本機圖片…');
-    fileBtn.append(fileInput);
+    // 文字放在 <span>：更新文案時不會移除裡面的 <input type="file">
+    const fileBtn = el('label', { class: 'agi18n-btn', 'data-agi18n': 'pick' });
+    fileBtn.append(elT('span', {}, 'pick'), fileInput);
 
     const presetGrid = el('div', { class: 'agi18n-presets' });
     for (const name of Object.keys(presets)) {
       if (!hasPreset(name)) continue;
-      const b = el('button', { type: 'button', 'data-agi18n-preset': name, title: name }, presets[name]!.label);
+      const b = tx(el('button', { type: 'button', 'data-agi18n-preset': name, title: name }), `preset.${name}`, undefined, presets[name]!.label);
       // 預設本身就是只含漸層與顏色的 CSS（掛鉤已驗證），可直接當作縮圖
       b.style.backgroundImage = presets[name]!.image;
       presetGrid.append(b);
@@ -486,65 +651,66 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       return [input, out, row];
     };
     const [opacityIn, opacityOut, opacityRow] = range('opacity', '0.01', '1', '0.01');
-    opacityRow.append(el('span', {}, '不透明度'), opacityIn, opacityOut);
+    opacityRow.append(elT('span', {}, 'label.opacity'), opacityIn, opacityOut);
     const [blurIn, blurOut, blurRow] = range('blur', '0', '32', '1');
-    blurRow.append(el('span', {}, '模糊'), blurIn, blurOut);
+    blurRow.append(elT('span', {}, 'label.blur'), blurIn, blurOut);
 
-    const select = (key: string, label: string, options: [string, string][]): [HTMLSelectElement, HTMLLabelElement] => {
+    /** options：[值, 文案 key] */
+    const select = (key: string, labelKey: string, options: [string, string][]): [HTMLSelectElement, HTMLLabelElement] => {
       const s = el('select', { 'data-agi18n': key });
-      for (const [v, t] of options) s.append(el('option', { value: v }, t));
+      for (const [v, k] of options) s.append(elT('option', { value: v }, k));
       const row = el('label', { class: 'agi18n-row' });
-      row.append(el('span', {}, label), s);
+      row.append(elT('span', {}, labelKey), s);
       return [s, row];
     };
-    const [positionSel, positionRow] = select('position', '對齊', [
-      ['center', '置中'],
-      ['top', '靠上'],
-      ['bottom', '靠下'],
-      ['left', '靠左'],
-      ['right', '靠右'],
+    const [positionSel, positionRow] = select('position', 'label.position', [
+      ['center', 'pos.center'],
+      ['top', 'pos.top'],
+      ['bottom', 'pos.bottom'],
+      ['left', 'pos.left'],
+      ['right', 'pos.right'],
     ]);
-    const [sizeSel, sizeRow] = select('size', '縮放', [
-      ['cover', '填滿（cover）'],
-      ['contain', '完整顯示（contain）'],
+    const [sizeSel, sizeRow] = select('size', 'label.size', [
+      ['cover', 'size.cover'],
+      ['contain', 'size.contain'],
     ]);
-    const [tintSel, tintRow] = select('tint', '遮罩', TINTS);
-    const [modeSel, modeRow] = select('mode', '圖層', [
-      ['overlay', '覆蓋在介面上（overlay）'],
-      ['underlay', '放在介面底層（underlay）'],
+    const [tintSel, tintRow] = select('tint', 'label.tint', TINTS);
+    const [modeSel, modeRow] = select('mode', 'label.mode', [
+      ['overlay', 'mode.overlay'],
+      ['underlay', 'mode.underlay'],
     ]);
 
-    const resetBtn = el('button', { type: 'button', 'data-agi18n': 'reset' }, '重設（改回 CLI 設定）');
+    const resetBtn = elT('button', { type: 'button', 'data-agi18n': 'reset' }, 'reset');
     // 介面語言：五語免重整切換（翻譯 runtime 沒有載入時整列隱藏）
-    const langSel = el('select', { 'data-agi18n': 'i18n', 'aria-label': '介面語言' });
+    const langSel = tx(el('select', { 'data-agi18n': 'i18n' }), 'lang.label', 'aria-label');
     const i18nRow = el('label', { class: 'agi18n-row' });
-    const i18nTitle = el('div', { class: 'agi18n-sub' }, '語言');
-    i18nRow.append(el('span', {}, '介面語言'), langSel);
+    const i18nTitle = elT('div', { class: 'agi18n-sub' }, 'sec.lang');
+    i18nRow.append(elT('span', {}, 'lang.label'), langSel);
 
     // 桌布收藏夾與自動輪播
-    const galleryTitle = el('div', { class: 'agi18n-sub' }, '桌布收藏夾');
-    const addBtn = el('button', { type: 'button', 'data-agi18n': 'gallery-add' }, '加入目前圖片');
-    const nextBtn = el('button', { type: 'button', 'data-agi18n': 'gallery-next' }, '下一張');
+    const galleryTitle = elT('div', { class: 'agi18n-sub' }, 'sec.gallery');
+    const addBtn = elT('button', { type: 'button', 'data-agi18n': 'gallery-add' }, 'gallery.add');
+    const nextBtn = elT('button', { type: 'button', 'data-agi18n': 'gallery-next' }, 'gallery.next');
     const quota = el('span', { class: 'agi18n-quota', 'data-agi18n': 'gallery-quota' });
     const galleryRow = el('div', { class: 'agi18n-row' });
     galleryRow.append(addBtn, nextBtn, quota);
     const galleryGrid = el('div', { class: 'agi18n-gallery', 'data-agi18n': 'gallery' });
-    const [slideSel, slideRow] = select('slideshow', '自動輪播', [
-      ['off', '關閉'],
-      ['on-launch', '每次開啟視窗換下一張'],
-      ['15m', '每 15 分鐘'],
-      ['30m', '每 30 分鐘'],
-      ['60m', '每 60 分鐘'],
+    const [slideSel, slideRow] = select('slideshow', 'label.slideshow', [
+      ['off', 'slide.off'],
+      ['on-launch', 'slide.on-launch'],
+      ['15m', 'slide.15m'],
+      ['30m', 'slide.30m'],
+      ['60m', 'slide.60m'],
     ]);
 
     // 外觀微調
-    const lookTitle = el('div', { class: 'agi18n-sub' }, '外觀微調');
+    const lookTitle = elT('div', { class: 'agi18n-sub' }, 'sec.tweaks');
     const fontBox = el('input', { type: 'checkbox', 'data-agi18n': 'cjk-font' });
     const fontRow = el('label', { class: 'agi18n-row' });
-    fontRow.append(el('span', {}, 'CJK 介面字型最佳化'), fontBox);
+    fontRow.append(elT('span', {}, 'cjkFont'), fontBox);
     const glassBox = el('input', { type: 'checkbox', 'data-agi18n': 'glass' });
     const glassRow = el('label', { class: 'agi18n-row' });
-    glassRow.append(el('span', {}, '毛玻璃卡片模式'), glassBox);
+    glassRow.append(elT('span', {}, 'glass'), glassBox);
 
     const fontStyle = el('style', { id: 'antigravity-i18n-font', [SKIP]: '' });
     const MONO = ['code', 'pre', 'kbd', 'samp', '.monaco-editor', '.xterm', '[class*="mono"]'];
@@ -579,31 +745,31 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       'background-color:rgba(30,30,36,0.55);background-color:color-mix(in srgb,Canvas 62%,transparent) !important;' +
       '-webkit-backdrop-filter:blur(10px) saturate(1.15);backdrop-filter:blur(10px) saturate(1.15);' +
       'border-color:color-mix(in srgb,CanvasText 14%,transparent);}';
-    const scanTitle = el('div', { class: 'agi18n-sub' }, '掃描未翻譯英文');
-    const scanBtn = el('button', { type: 'button', 'data-agi18n': 'scan' }, '掃描本頁');
+    const scanTitle = elT('div', { class: 'agi18n-sub' }, 'sec.scan');
+    const scanBtn = elT('button', { type: 'button', 'data-agi18n': 'scan' }, 'scan.run');
     const scanCount = el('span', { 'data-agi18n': 'scan-count' });
     const scanRow = el('div', { class: 'agi18n-row' });
     scanRow.append(scanBtn, scanCount);
     const scanList = el('ul', { class: 'agi18n-scan-list', 'data-agi18n': 'scan-list' });
-    const copyBtn = el('button', { type: 'button', 'data-agi18n': 'scan-copy', disabled: '' }, '複製 JSON');
-    const reportLink = el(
+    const copyBtn = elT('button', { type: 'button', 'data-agi18n': 'scan-copy', disabled: '' }, 'scan.copy');
+    const reportLink = elT(
       'a',
       { class: 'agi18n-btn', 'data-agi18n': 'scan-report', href: 'https://github.com/Carinoasd/antigravity-i18n/issues/new?template=missing-translation.yml', target: '_blank', rel: 'noopener noreferrer' },
-      '前往 GitHub 回報',
+      'scan.report',
     );
     const scanActions = el('div', { class: 'agi18n-row' });
     scanActions.append(copyBtn, reportLink);
     const msg = el('div', { class: 'agi18n-msg', 'data-agi18n': 'msg', 'aria-live': 'polite' });
-    const foot = el('div', { class: 'agi18n-foot' }, 'Ctrl+Alt+B（macOS：⌘+⌥+B）開關．Esc 關閉');
+    const foot = elT('div', { class: 'agi18n-foot' }, 'foot');
 
     panel.append(
       head,
       enabledRow,
-      el('div', { class: 'agi18n-sub' }, '背景來源'),
+      elT('div', { class: 'agi18n-sub' }, 'sec.source'),
       fileBtn,
-      el('div', { class: 'agi18n-sub' }, '內建漸層'),
+      elT('div', { class: 'agi18n-sub' }, 'sec.presets'),
       presetGrid,
-      el('div', { class: 'agi18n-sub' }, '外觀'),
+      elT('div', { class: 'agi18n-sub' }, 'sec.look'),
       opacityRow,
       blurRow,
       positionRow,
@@ -629,12 +795,46 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       foot,
     );
 
-    const launcher = el('button', { type: 'button', id: 'antigravity-i18n-bg-launcher', [SKIP]: '', hidden: '', title: '背景設定（Ctrl+Alt+B）' }, '🖼 背景設定');
+    const launcher = tx(tx(el('button', { type: 'button', id: 'antigravity-i18n-bg-launcher', [SKIP]: '', hidden: '' }), 'launcherTitle', 'title'), 'launcher');
 
-    const say = (text: string, isWarn = false): void => {
-      msg.textContent = text;
+    /** 狀態訊息：記住 key 與參數，切換語系時以新語系重新顯示 */
+    let lastMsg: { key: string; vars?: Vars } | null = null;
+    const say = (key: string, vars?: Vars, isWarn = false): void => {
+      lastMsg = { key, vars };
+      msg.textContent = t(key, vars);
       if (isWarn) msg.setAttribute('data-warn', '');
       else msg.removeAttribute('data-warn');
+    };
+    /** 容量配額（null：尚未讀取；disabled：沒有 IndexedDB） */
+    let quotaState: { count: number; total: number } | 'disabled' | null = null;
+    const renderQuota = (): void => {
+      if (quotaState === null) quota.textContent = '';
+      else if (quotaState === 'disabled') quota.textContent = t('gallery.unavailable');
+      else quota.textContent = t('gallery.quota', { count: quotaState.count, max: MAX_ITEMS, used: mb(quotaState.total), total: mb(MAX_TOTAL) });
+    };
+    /** 把所有綁定的文字、選項、小按鈕與目前的狀態訊息換成面板目前的語系 */
+    const applyTexts = (): void => {
+      for (const b of bound) {
+        const v = t(b.key, undefined, b.fallback);
+        if (b.attr) b.n.setAttribute(b.attr, v);
+        else b.n.textContent = v;
+      }
+      panel.setAttribute('lang', BCP47[uiLang] ?? uiLang);
+      launcher.setAttribute('lang', BCP47[uiLang] ?? uiLang);
+      for (const o of Array.from(langSel.options)) o.textContent = langLabel(o.value);
+      galleryGrid.querySelectorAll('[data-agi18n-gallery-del]').forEach((d) => {
+        d.setAttribute('title', t('gallery.delete'));
+        d.setAttribute('aria-label', t('gallery.delete'));
+      });
+      renderQuota();
+      if (scanDone) renderScan();
+      if (lastMsg) msg.textContent = t(lastMsg.key, lastMsg.vars);
+    };
+    const refreshLang = (): void => {
+      const next = pickLang();
+      if (next === uiLang) return;
+      uiLang = next;
+      applyTexts();
     };
 
     const sync = (): void => {
@@ -652,10 +852,11 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       presetGrid.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.getAttribute('data-agi18n-preset') === active)));
       const ov = g.__ANTIGRAVITY_I18N__;
       const langs = ov && Array.isArray(ov.availableLangs) && ov.availableLangs.length > 0 ? ov.availableLangs : ov ? [ov.lang ?? 'zh-TW', 'en'] : [];
-      const wanted = LANG_LABELS.filter((l) => langs.includes(l[0]));
-      if (langSel.options.length !== wanted.length || wanted.some((l, i) => langSel.options[i]?.value !== l[0])) {
+      refreshLang();
+      const wanted = LANG_ORDER.filter((l) => langs.includes(l));
+      if (langSel.options.length !== wanted.length || wanted.some((l, i) => langSel.options[i]?.value !== l)) {
         langSel.textContent = '';
-        for (const [v, t] of wanted) langSel.append(el('option', { value: v }, t));
+        for (const v of wanted) langSel.append(el('option', { value: v }, langLabel(v)));
       }
       langSel.disabled = !ov;
       if (ov) langSel.value = ov.enabled === false ? 'en' : (ov.lang ?? 'zh-TW');
@@ -714,7 +915,7 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     const savePrefs = (): void => {
       if (!db) return;
       idbRequest('readwrite', (s) => s.put({ ...prefs }, PREFS_KEY)).catch((e) => {
-        say('無法寫入 IndexedDB，變更只在目前視窗生效', true);
+        say('msg.saveFailed', undefined, true);
         warn('save prefs failed', e);
       });
     };
@@ -759,7 +960,8 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     const renderGallery = (list: GalleryMeta[]): void => {
       galleryGrid.textContent = '';
       const total = list.reduce((n, m) => n + m.size, 0);
-      quota.textContent = `${list.length}/${MAX_ITEMS} 張．${mb(total)}/${mb(MAX_TOTAL)} MB`;
+      quotaState = { count: list.length, total };
+      renderQuota();
       const active = ui?.source === 'gallery' ? ui.galleryId : undefined;
       for (const m of list) {
         const cell = el('div', { class: 'agi18n-thumb' });
@@ -767,14 +969,15 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
         // 縮圖已通過 DATA_RE 驗證（只含 base64 字元），可安全放進 url("…")
         if (m.thumb) pick.style.backgroundImage = `url("${m.thumb}")`;
         else pick.textContent = String(galleryGrid.childElementCount + 1);
-        const del = el('button', { type: 'button', 'data-agi18n-gallery-del': m.id, title: '從收藏夾刪除', 'aria-label': '從收藏夾刪除' }, '✕');
+        const del = el('button', { type: 'button', 'data-agi18n-gallery-del': m.id, title: t('gallery.delete'), 'aria-label': t('gallery.delete') }, '✕');
         cell.append(pick, del);
         galleryGrid.append(cell);
       }
     };
     const refreshGallery = async (): Promise<GalleryMeta[]> => {
       if (!db) {
-        quota.textContent = '無法使用 IndexedDB，收藏夾停用';
+        quotaState = 'disabled';
+        renderQuota();
         return [];
       }
       const list = await scanGallery();
@@ -825,7 +1028,7 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
         return await fn();
       } catch (e) {
         warn('gallery failed', e);
-        say('收藏夾操作失敗', true);
+        say('msg.galleryFailed', undefined, true);
         return fallback;
       } finally {
         galleryBusy = false;
@@ -839,33 +1042,33 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     const addToGallery = (): Promise<string | null> =>
       exclusive<string | null>(null, async () => {
         if (!db) {
-          say('此環境無法使用 IndexedDB，收藏夾無法使用', true);
+          say('msg.galleryNoIdb', undefined, true);
           return null;
         }
         const src = currentImage();
         if (!src) {
-          say('目前的背景不是圖片：請先「選擇本機圖片…」再加入收藏', true);
+          say('msg.notImage', undefined, true);
           return null;
         }
         const size = bytesOf(src);
         if (size > maxBytes) {
-          say(`圖片 ${mb(size)} MB 超過單張上限 ${mb(maxBytes)} MB`, true);
+          say('msg.itemTooLarge', { size: mb(size), max: mb(maxBytes) }, true);
           return null;
         }
         const list = await scanGallery();
         const hash = fnv(src);
         const dup = list.find((m) => m.hash === hash && m.size === size);
         if (dup) {
-          say('這張圖片已在收藏夾中');
+          say('msg.duplicate');
           return dup.id;
         }
         if (list.length >= MAX_ITEMS) {
-          say(`收藏夾最多 ${MAX_ITEMS} 張，請先刪除不需要的圖片`, true);
+          say('msg.galleryFull', { max: MAX_ITEMS }, true);
           return null;
         }
         const used = list.reduce((n, m) => n + m.size, 0);
         if (used + size > MAX_TOTAL) {
-          say(`收藏夾總容量上限 ${mb(MAX_TOTAL)} MB（已用 ${mb(used)} MB，這張 ${mb(size)} MB），請先刪除不需要的圖片`, true);
+          say('msg.galleryQuota', { max: mb(MAX_TOTAL), used: mb(used), size: mb(size) }, true);
           return null;
         }
         const id = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8).padEnd(6, '0')}`;
@@ -874,14 +1077,14 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
         // 改為引用收藏：設定裡不再重複存放同一張圖片
         showGalleryImage(item);
         await refreshGallery();
-        say(`已加入收藏夾（${galleryKeys.length}/${MAX_ITEMS}）`);
+        say('msg.galleryAdded', { count: galleryKeys.length, max: MAX_ITEMS });
         return id;
       });
     const selectGallery = (id: string): Promise<boolean> =>
       exclusive(false, async () => {
         const item = await getItem(id);
         if (!item) {
-          say('這張收藏已損毀或不存在，已略過', true);
+          say('msg.galleryBroken', undefined, true);
           return false;
         }
         showGalleryImage(item);
@@ -894,9 +1097,9 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
         if (ui?.source === 'gallery' && ui.galleryId === id) {
           galleryImage = null;
           update({ source: 'cli', galleryId: undefined });
-          say(cli ? '已刪除目前的桌布，改回 CLI 設定' : '已刪除目前的桌布');
+          say(cli ? 'msg.deletedCurrentCli' : 'msg.deletedCurrent');
         } else {
-          say('已從收藏夾刪除');
+          say('msg.deleted');
         }
         await refreshGallery();
         return true;
@@ -981,6 +1184,8 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     /** 已含中日韓文字的字串多半是譯文（或已在地化），不列入 */
     const CJK_RE = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
     let scanned: string[] = [];
+    /** 是否已掃描過（切換語系時重繪筆數） */
+    let scanDone = false;
 
     const isHidden = (e: Element): boolean => {
       if (e.hasAttribute('hidden') || e.getAttribute('aria-hidden') === 'true') return true;
@@ -1047,8 +1252,9 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     const renderScan = (): void => {
       scanList.textContent = '';
       for (const t of scanned.slice(0, 50)) scanList.append(el('li', { title: t }, t));
-      if (scanned.length > 50) scanList.append(el('li', {}, `…以及另外 ${scanned.length - 50} 筆`));
-      scanCount.textContent = `找到 ${scanned.length} 筆`;
+      if (scanned.length > 50) scanList.append(el('li', {}, t('scan.more', { n: scanned.length - 50 })));
+      scanCount.textContent = t('scan.count', { n: scanned.length });
+      scanDone = true;
       copyBtn.disabled = scanned.length === 0;
     };
     const copyText = (text: string): Promise<boolean> => {
@@ -1115,36 +1321,37 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       const name = b?.getAttribute('data-agi18n-preset');
       if (!hasPreset(name)) return;
       update({ enabled: true, source: 'preset', preset: name, dataUrl: undefined });
-      say(`已套用「${presets[name]!.label}」${persistent ? '' : '（只在目前視窗生效）'}`, !persistent);
+      // 預設名稱以 key 傳入：切換語系時訊息裡的名稱也會一起翻譯
+      say(persistent ? 'msg.applied' : 'msg.appliedTemp', { name: { t: `preset.${name}` } }, !persistent);
     });
     on(fileInput, 'change', () => {
       const file = fileInput.files && fileInput.files[0];
       fileInput.value = '';
       if (!file) return;
       if (file.size > maxBytes) {
-        say(`圖片大小 ${(file.size / 1024 / 1024).toFixed(1)} MB 超過上限 ${Math.round(maxBytes / 1024 / 1024)} MB，請選擇較小的圖片`, true);
+        say('msg.tooLarge', { size: (file.size / 1024 / 1024).toFixed(1), max: Math.round(maxBytes / 1024 / 1024) }, true);
         return;
       }
       if (!MIMES.includes(file.type)) {
-        say('只支援 PNG、JPEG、WebP、GIF 圖片', true);
+        say('msg.badType', undefined, true);
         return;
       }
       const Reader = g.FileReader;
       if (!Reader) {
-        say('此環境無法讀取本機檔案', true);
+        say('msg.noReader', undefined, true);
         return;
       }
       const reader = new Reader();
       reader.onload = () => {
         const url = typeof reader.result === 'string' ? reader.result : '';
         if (!DATA_RE.test(url)) {
-          say('無法讀取這張圖片', true);
+          say('msg.unreadable', undefined, true);
           return;
         }
         update({ enabled: true, source: 'image', dataUrl: url, preset: undefined });
-        say(persistent ? `已套用「${file.name}」並儲存` : `已套用「${file.name}」（只在目前視窗生效）`, !persistent);
+        say(persistent ? 'msg.imageSaved' : 'msg.appliedTemp', { name: file.name }, !persistent);
       };
-      reader.onerror = () => say('讀取圖片失敗', true);
+      reader.onerror = () => say('msg.readFailed', undefined, true);
       reader.readAsDataURL(file);
     });
     on(resetBtn, 'click', () => {
@@ -1153,13 +1360,12 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       if (db) idbRequest('readwrite', (s) => s.delete(KEY)).catch((e) => warn('reset failed', e));
       render();
       sync();
-      say(cli ? '已改回 CLI 設定（background.json）' : '已清除介面設定；目前沒有 CLI 背景設定，背景已關閉');
+      say(cli ? 'msg.resetCli' : 'msg.resetNone');
     });
     on(langSel, 'change', () => {
       const ov = g.__ANTIGRAVITY_I18N__;
       if (!ov) return;
       const v = langSel.value;
-      const label = LANG_LABELS.find((l) => l[0] === v)?.[1] ?? v;
       if (typeof ov.setLang === 'function') {
         // 翻譯 runtime 會先還原英文原文、再以新語系重譯整份文件，並記住選擇
         ov.setLang(v);
@@ -1175,13 +1381,15 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
         else ov.resume?.();
       }
       sync();
-      say(v === 'en' ? '已切換為英文原文' : `已切換為${label}`);
+      // sync() 已讓面板跟著切換語系，訊息也以新語系顯示
+      if (v === 'en') say('msg.langEn');
+      else say('msg.lang', { label: langLabel(v) });
     });
     on(addBtn, 'click', () => void addToGallery());
     on(nextBtn, 'click', () => {
       nextGallery()
         .then((ok) => {
-          if (!ok) say('收藏夾沒有圖片：先加入幾張再輪播', true);
+          if (!ok) say('msg.galleryEmpty', undefined, true);
         })
         .catch((e) => warn('next failed', e));
     });
@@ -1197,7 +1405,8 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     });
     on(slideSel, 'change', () => {
       setPrefs({ slideshow: slideSel.value as SlideshowMode });
-      say(prefs.slideshow === 'off' ? '已關閉自動輪播' : `已設定自動輪播：${slideSel.options[slideSel.selectedIndex]?.textContent ?? ''}`);
+      if (prefs.slideshow === 'off') say('msg.slideOff');
+      else say('msg.slideOn', { mode: { t: `slide.${prefs.slideshow}` } });
     });
     on(fontBox, 'change', () => setPrefs({ cjkFont: fontBox.checked }));
     on(glassBox, 'change', () => setPrefs({ glass: glassBox.checked }));
@@ -1208,13 +1417,14 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     on(scanBtn, 'click', () => {
       scan();
       renderScan();
-      if (!g.__ANTIGRAVITY_I18N__) say('目前沒有載入翻譯（僅背景模式），列出的是本頁所有英文字串', true);
-      else say(scanned.length > 0 ? `找到 ${scanned.length} 筆未翻譯的英文，可複製 JSON 後到 GitHub 回報` : '這一頁沒有找到未翻譯的英文');
+      if (!g.__ANTIGRAVITY_I18N__) say('msg.scanNoRuntime', undefined, true);
+      else if (scanned.length > 0) say('msg.scanFound', { n: scanned.length });
+      else say('msg.scanNone');
     });
     on(copyBtn, 'click', () => {
       if (scanned.length === 0) return;
       copyText(scanJson())
-        .then((ok) => say(ok ? `已複製 ${scanned.length} 筆到剪貼簿` : '無法存取剪貼簿，請改用開發者工具複製', !ok))
+        .then((ok) => (ok ? say('msg.copied', { n: scanned.length }) : say('msg.copyFailed', undefined, true)))
         .catch((e) => warn('copy failed', e));
     });
 
@@ -1277,6 +1487,8 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
     }
 
     // ── 啟動：讀取 IndexedDB → 決定套用介面設定或 CLI 設定 ──
+    // 所有綁定都建立完成後套用一次（含 lang 屬性）
+    applyTexts();
     mount();
     checkLauncher();
     const ready = openDb()
@@ -1312,7 +1524,7 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
           render();
           schedule();
           sync();
-          if (!persistent) say('此環境無法使用 IndexedDB：介面中的變更只在目前視窗生效，重新開啟後會改回 CLI 設定', true);
+          if (!persistent) say('msg.noIdb', undefined, true);
         } catch (e) {
           warn('render failed', e);
         }
@@ -1353,8 +1565,12 @@ export function antigravityI18nPanel(applyBackground: (p: BackgroundPayload) => 
       selectGallery,
       removeGallery,
       next: nextGallery,
+      get uiLang() {
+        return uiLang;
+      },
+      text: (key, vars) => t(key, vars),
       setLang: (lang) => {
-        if (!LANG_LABELS.some((l) => l[0] === lang)) return;
+        if (!LANG_ORDER.includes(lang)) return;
         langSel.value = lang;
         langSel.dispatchEvent(new (doc.defaultView?.Event ?? Event)('change'));
       },
